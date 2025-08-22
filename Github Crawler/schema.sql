@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS repos (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE,
+    stars INTEGER,
+    last_updated TIMESTAMP DEFAULT NOW()
+);
