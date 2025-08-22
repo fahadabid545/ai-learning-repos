@@ -2,10 +2,13 @@ name: GitHub Crawler
 
 on:
   workflow_dispatch:  # run manually from Actions tab
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
+    timeout-minutes: 60  # Set timeout to prevent infinite runs
 
     services:
       postgres:
@@ -37,9 +40,12 @@ jobs:
       - name: Wait for Postgres to be ready
         run: |
           for i in `seq 1 30`; do
-            pg_isready -h localhost -p 5432 -U postgres && break
+            pg_isready -h localhost -p 5432 -U postgres && exit 0
             sleep 2
           done
+          exit 1
+        env:
+          PGPASSWORD: postgres
 
       - name: Create schema
         run: psql -h localhost -U postgres -d postgres -f schema.sql
@@ -53,7 +59,7 @@ jobs:
 
       - name: Dump DB to CSV
         run: |
-          psql -h localhost -U postgres -d postgres -c "\COPY repos TO 'repos.csv' CSV HEADER"
+          psql -h localhost -U postgres -d postgres -c "\COPY repositories TO 'repos.csv' CSV HEADER"
           ls -lah
         env:
           PGPASSWORD: postgres
