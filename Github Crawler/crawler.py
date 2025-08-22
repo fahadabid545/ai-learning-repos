@@ -2,25 +2,13 @@ import os
 import time
 import requests
 import psycopg2
-from datetime import datetime
-import logging
-from typing import Optional, Dict, Any, List
-import json
+from typing import Optional, Dict, Any
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+GITHUB_API = "https://api.github.com/graphql"
+TOKEN = os.getenv("GITHUB_TOKEN")
 
 class GitHubCrawler:
     def __init__(self):
-        self.token = os.getenv("GITHUB_TOKEN")
-        self.api_url = "https://api.github.com/graphql"
-        self.headers = {
-            "Authorization": f"bearer {self.token}",
-            "Content-Type": "application/json"
-        }
-        
-        # Database connection
         self.conn = psycopg2.connect(
             dbname="postgres",
             user="postgres",
@@ -29,180 +17,135 @@ class GitHubCrawler:
             port=5432
         )
         self.cur = self.conn.cursor()
-        
-        # Rate limiting
         self.rate_limit_remaining = 5000  # Initial assumption
-        self.rate_limit_reset = time.time() + 3600
+        self.rate_limit_reset = time.time() + 3600  # Initial assumption
+
+    def run_query(self, query: str, variables: Optional[Dict] = None) -> Dict[str, Any]:
+        headers = {"Authorization": f"Bearer {TOKEN}"}
+        json_data = {"query": query, "variables": variables or {}}
         
-    def check_rate_limit(self):
-        """Check rate limit and wait if necessary"""
+        # Check rate limit
+        current_time = time.time()
         if self.rate_limit_remaining <= 10:
-            sleep_time = max(self.rate_limit_reset - time.time(), 0) + 10
-            logger.warning(f"Rate limit approaching. Sleeping for {sleep_time} seconds")
-            time.sleep(sleep_time)
-            # Reset rate limit after sleep
-            self.rate_limit_remaining = 5000
-    
-    def execute_graphql_query(self, query: str, variables: Optional[Dict] = None) -> Optional[Dict]:
-        """Execute a GraphQL query with proper error handling and rate limiting"""
-        self.check_rate_limit()
+            sleep_time = max(self.rate_limit_reset - current_time, 0)
+            if sleep_time > 0:
+                print(f"⏳ Rate limit approaching. Sleeping for {sleep_time:.2f} seconds")
+                time.sleep(sleep_time + 1)  # Add buffer
         
-        try:
-            response = requests.post(
-                self.api_url,
-                headers=self.headers,
-                json={"query": query, "variables": variables or {}},
-                timeout=60
-            )
-            
-            # Update rate limit info
-            if "x-ratelimit-remaining" in response.headers:
-                self.rate_limit_remaining = int(response.headers["x-ratelimit-remaining"])
-            if "x-ratelimit-reset" in response.headers:
-                self.rate_limit_reset = int(response.headers["x-ratelimit-reset"])
-            
-            if response.status_code != 200:
-                logger.error(f"GraphQL query failed with status {response.status_code}: {response.text}")
-                if response.status_code == 403:  # Rate limited
-                    sleep_time = max(self.rate_limit_reset - time.time(), 0) + 10
-                    logger.warning(f"Rate limited. Sleeping for {sleep_time} seconds")
-                    time.sleep(sleep_time)
-                return None
-                
+        response = requests.post(GITHUB_API, json=json_data, headers=headers)
+        
+        # Update rate limit info from headers
+        if 'X-RateLimit-Remaining' in response.headers:
+            self.rate_limit_remaining = int(response.headers['X-RateLimit-Remaining'])
+        if 'X-RateLimit-Reset' in response.headers:
+            self.rate_limit_reset = int(response.headers['X-RateLimit-Reset'])
+        
+        if response.status_code == 200:
             data = response.json()
-            
-            if "errors" in data:
-                logger.error(f"GraphQL errors: {data['errors']}")
-                return None
-                
+            if 'errors' in data:
+                raise Exception(f"GraphQL errors: {data['errors']}")
             return data
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request failed: {e}")
-            return None
-    
-    def fetch_repositories_by_stars(self, min_stars: int = 100, batch_size: int = 1000):
-        """Fetch repositories ordered by stars"""
+        elif response.status_code == 403 and 'rate limit' in response.text.lower():
+            # Rate limited, wait until reset
+            sleep_time = max(self.rate_limit_reset - time.time(), 0)
+            print(f"⏳ Rate limited. Sleeping for {sleep_time:.2f} seconds")
+            time.sleep(sleep_time + 1)
+            return self.run_query(query, variables)  # Retry
+        else:
+            raise Exception(f"Query failed: {response.status_code} {response.text}")
+
+    def save_repos_batch(self, repos_data):
+        """Save multiple repos in a single query for efficiency"""
+        values = []
+        for repo in repos_data:
+            values.append(f"('{repo['name']}', {repo['stars']})")
+        
+        if values:
+            query = """
+                INSERT INTO repos (name, stars) 
+                VALUES """ + ", ".join(values) + """
+                ON CONFLICT (name) 
+                DO UPDATE SET stars = EXCLUDED.stars
+            """
+            self.cur.execute(query)
+            self.conn.commit()
+
+    def crawl_repos(self, limit=100000):
         query = """
-        query ($cursor: String, $minStars: Int!) {
-            search(
-                query: "stars:>=$minStars sort:stars-desc",
-                type: REPOSITORY,
-                first: 100,
-                after: $cursor
-            ) {
-                pageInfo {
-                    hasNextPage
-                    endCursor
+        query($cursor: String, $queryString: String!) {
+            search(query: $queryString, type: REPOSITORY, first: 100, after: $cursor) {
+            repositoryCount
+            edges {
+                node {
+                ... on Repository {
+                    nameWithOwner
+                    stargazerCount
                 }
-                nodes {
-                    ... on Repository {
-                        id
-                        name
-                        owner {
-                            login
-                        }
-                        stargazerCount
-                        createdAt
-                        updatedAt
-                    }
                 }
             }
-            rateLimit {
-                cost
-                remaining
-                resetAt
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
             }
         }
         """
-        
-        cursor = None
+
         count = 0
-        target_count = 100000
+        cursor = None
+        batch_size = 1000  # Commit in batches for efficiency
+        batch_data = []
         
-        while count < target_count:
-            variables = {
-                "cursor": cursor,
-                "minStars": min_stars
-            }
-            
-            data = self.execute_graphql_query(query, variables)
-            if not data:
-                logger.warning("Failed to fetch data, retrying after delay")
-                time.sleep(30)
-                continue
+        # Use a broader search query
+        query_string = "size:>0"  # More inclusive than stars:>1
+        
+        while count < limit:
+            try:
+                data = self.run_query(query, {"cursor": cursor, "queryString": query_string})
+                search_data = data["data"]["search"]
+                repos = search_data["edges"]
                 
-            search_data = data["data"]["search"]
-            repositories = []
-            
-            for node in search_data["nodes"]:
-                repositories.append((
-                    node["id"],
-                    node["name"],
-                    node["owner"]["login"],
-                    node["stargazerCount"],
-                    node["createdAt"],
-                    node["updatedAt"],
-                    datetime.now()
-                ))
-                count += 1
+                for edge in repos:
+                    if count >= limit:
+                        break
+                        
+                    repo = edge["node"]
+                    batch_data.append({
+                        "name": repo["nameWithOwner"],
+                        "stars": repo["stargazerCount"]
+                    })
+                    count += 1
+                    
+                    # Commit in batches
+                    if len(batch_data) >= batch_size:
+                        self.save_repos_batch(batch_data)
+                        batch_data = []
+                        print(f"✅ Saved {count}/{limit} repositories")
                 
-                if count >= target_count:
+                # Save any remaining repos in the batch
+                if batch_data:
+                    self.save_repos_batch(batch_data)
+                    batch_data = []
+                
+                if not search_data["pageInfo"]["hasNextPage"]:
+                    print("ℹ️ No more pages available")
                     break
-            
-            # Batch insert
-            self.batch_insert_repositories(repositories)
-            
-            if not search_data["pageInfo"]["hasNextPage"]:
-                logger.info("No more pages available")
-                break
+                    
+                cursor = search_data["pageInfo"]["endCursor"]
                 
-            cursor = search_data["pageInfo"]["endCursor"]
-            
-            # Update min_stars to get different repositories in next iteration
-            if count < target_count and len(repositories) > 0:
-                min_stars = repositories[-1][3] - 1  # Last repository's star count minus one
-    
-    def batch_insert_repositories(self, repositories: List[tuple]):
-        """Insert repositories in batches"""
-        if not repositories:
-            return
-            
-        try:
-            # Use ON CONFLICT to update existing records
-            self.cur.executemany(
-                """
-                INSERT INTO repositories (github_id, name, owner_login, stargazers_count, created_at, updated_at, last_crawled_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (github_id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    owner_login = EXCLUDED.owner_login,
-                    stargazers_count = EXCLUDED.stargazers_count,
-                    updated_at = EXCLUDED.updated_at,
-                    last_crawled_at = EXCLUDED.last_crawled_at
-                """,
-                repositories
-            )
-            self.conn.commit()
-            logger.info(f"Inserted/updated {len(repositories)} repositories")
-            
-        except Exception as e:
-            self.conn.rollback()
-            logger.error(f"Failed to insert repositories: {e}")
-    
+            except Exception as e:
+                print(f"❌ Error: {e}")
+                time.sleep(10)  # Wait before retrying
+
+        print(f"✅ Crawled {count} repositories.")
+
     def close(self):
-        """Close database connection"""
         self.cur.close()
         self.conn.close()
 
-def main():
+if __name__ == "__main__":
     crawler = GitHubCrawler()
     try:
-        crawler.fetch_repositories_by_stars(min_stars=100)
-    except Exception as e:
-        logger.error(f"Crawler failed: {e}")
+        crawler.crawl_repos(100000)
     finally:
         crawler.close()
-
-if __name__ == "__main__":
-    main()
