@@ -1,9 +1,16 @@
+-- schema.sql
+
 CREATE TABLE IF NOT EXISTS repos (
     id SERIAL PRIMARY KEY,
-    name TEXT UNIQUE NOT NULL,
-    stars INTEGER NOT NULL,
+    topic TEXT NOT NULL,                -- learning topic category
+    name TEXT NOT NULL,                 -- repo name only (not owner)
+    owner TEXT NOT NULL,                -- repo owner
+    url TEXT UNIQUE NOT NULL,           -- GitHub repo URL
+    stars INTEGER NOT NULL,             -- stargazer count
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_repos_name ON repos(name);
+-- Helpful indexes
+CREATE INDEX IF NOT EXISTS idx_repos_topic ON repos(topic);
+CREATE INDEX IF NOT EXISTS idx_repos_owner ON repos(owner);
 CREATE INDEX IF NOT EXISTS idx_repos_stars ON repos(stars);

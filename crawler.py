@@ -1,151 +1,100 @@
-import os
-import time
+# crawler.py
 import requests
-import psycopg2
-from typing import Optional, Dict, Any
+import pandas as pd
 
-GITHUB_API = "https://api.github.com/graphql"
-TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_API_URL = "https://api.github.com/search/repositories"
+TOKEN = None  # 🔑 Add your GitHub token for higher rate limits
+HEADERS = {"Authorization": f"token {TOKEN}"} if TOKEN else {}
 
-class GitHubCrawler:
-    def __init__(self):
-        self.conn = psycopg2.connect(
-            dbname="postgres",
-            user="postgres",
-            password="postgres",
-            host="localhost",
-            port=5432
-        )
-        self.cur = self.conn.cursor()
-        self.rate_limit_remaining = 5000  # Initial assumption
-        self.rate_limit_reset = time.time() + 3600  # Initial assumption
+# 🎯 Refined topics → queries
+TOPICS = {
+    # 1. Math & Foundations
+    "math for ai": "linear algebra OR calculus OR probability OR optimization tutorial notebook",
 
-    def run_query(self, query: str, variables: Optional[Dict] = None) -> Dict[str, Any]:
-        headers = {"Authorization": f"Bearer {TOKEN}"}
-        json_data = {"query": query, "variables": variables or {}}
-        
-        # Check rate limit
-        current_time = time.time()
-        if self.rate_limit_remaining <= 10:
-            sleep_time = max(self.rate_limit_reset - current_time, 0)
-            if sleep_time > 0:
-                print(f"⏳ Rate limit approaching. Sleeping for {sleep_time:.2f} seconds")
-                time.sleep(sleep_time + 1)  # Add buffer
-        
-        response = requests.post(GITHUB_API, json=json_data, headers=headers)
-        
-        # Update rate limit info from headers
-        if 'X-RateLimit-Remaining' in response.headers:
-            self.rate_limit_remaining = int(response.headers['X-RateLimit-Remaining'])
-        if 'X-RateLimit-Reset' in response.headers:
-            self.rate_limit_reset = int(response.headers['X-RateLimit-Reset'])
-        
-        if response.status_code == 200:
-            data = response.json()
-            if 'errors' in data:
-                raise Exception(f"GraphQL errors: {data['errors']}")
-            return data
-        elif response.status_code == 403 and 'rate limit' in response.text.lower():
-            # Rate limited, wait until reset
-            sleep_time = max(self.rate_limit_reset - time.time(), 0)
-            print(f"⏳ Rate limited. Sleeping for {sleep_time:.2f} seconds")
-            time.sleep(sleep_time + 1)
-            return self.run_query(query, variables)  # Retry
-        else:
-            raise Exception(f"Query failed: {response.status_code} {response.text}")
+    # 2. Programming
+    "python for ai": "python machine learning tutorial OR course OR 30-days",
+    "software engineering basics": "git docker pytest debugging machine learning",
 
-    def save_repos_batch(self, repos_data):
-        """Save multiple repos in a single query for efficiency"""
-        values = []
-        for repo in repos_data:
-            values.append(f"('{repo['name']}', {repo['stars']})")
-        
-        if values:
-            query = """
-                INSERT INTO repos (name, stars) 
-                VALUES """ + ", ".join(values) + """
-                ON CONFLICT (name) 
-                DO UPDATE SET stars = EXCLUDED.stars
-            """
-            self.cur.execute(query)
-            self.conn.commit()
+    # 3. Data Handling
+    "data engineering": "pandas data cleaning EDA tutorial notebook",
+    "data pipelines": "spark dvc dataset versioning tutorial",
 
-    def crawl_repos(self, limit=100000):
-        query = """
-        query($cursor: String, $queryString: String!) {
-            search(query: $queryString, type: REPOSITORY, first: 100, after: $cursor) {
-            repositoryCount
-            edges {
-                node {
-                ... on Repository {
-                    nameWithOwner
-                    stargazerCount
-                }
-                }
-            }
-            pageInfo {
-                hasNextPage
-                endCursor
-            }
-            }
-        }
-        """
+    # 4. Classic ML
+    "machine learning basics": "scikit-learn tutorial examples beginner",
+    "ensemble methods": "xgboost lightgbm tutorial notebook",
 
-        count = 0
-        cursor = None
-        batch_size = 1000  # Commit in batches for efficiency
-        batch_data = []
-        
-        # Use a broader search query
-        query_string = "size:>0"  # More inclusive than stars:>1
-        
-        while count < limit:
-            try:
-                data = self.run_query(query, {"cursor": cursor, "queryString": query_string})
-                search_data = data["data"]["search"]
-                repos = search_data["edges"]
-                
-                for edge in repos:
-                    if count >= limit:
-                        break
-                        
-                    repo = edge["node"]
-                    batch_data.append({
-                        "name": repo["nameWithOwner"],
-                        "stars": repo["stargazerCount"]
-                    })
-                    count += 1
-                    
-                    # Commit in batches
-                    if len(batch_data) >= batch_size:
-                        self.save_repos_batch(batch_data)
-                        batch_data = []
-                        print(f"✅ Saved {count}/{limit} repositories")
-                
-                # Save any remaining repos in the batch
-                if batch_data:
-                    self.save_repos_batch(batch_data)
-                    batch_data = []
-                
-                if not search_data["pageInfo"]["hasNextPage"]:
-                    print("ℹ️ No more pages available")
-                    break
-                    
-                cursor = search_data["pageInfo"]["endCursor"]
-                
-            except Exception as e:
-                print(f"❌ Error: {e}")
-                time.sleep(10)  # Wait before retrying
+    # 5. Deep Learning
+    "deep learning basics": "neural networks pytorch tensorflow tutorial",
+    "transformers": "transformer attention tutorial huggingface notebook",
 
-        print(f"✅ Crawled {count} repositories.")
+    # 6. NLP
+    "nlp basics": "tokenization embeddings bert gpt huggingface tutorial",
+    "rag & llms": "retrieval augmented generation langchain huggingface tutorial",
 
-    def close(self):
-        self.cur.close()
-        self.conn.close()
+    # 7. Computer Vision
+    "computer vision basics": "image classification object detection tutorial",
+    "generative vision": "diffusion models stable diffusion style transfer repo",
+
+    # 8. Reinforcement Learning
+    "reinforcement learning": "reinforcement learning tutorial openai gym ppo dqn",
+
+    # 9. Graph ML
+    "graph neural networks": "graph neural network pytorch geometric dgl tutorial",
+
+    # 10. Time Series & Speech
+    "time series": "forecasting arima prophet tutorial notebook",
+    "speech processing": "speech recognition tts asr tutorial repo",
+
+    # 11. MLOps & Deployment
+    "mlops basics": "mlops pipeline mlflow weights and biases tutorial",
+    "model deployment": "fastapi flask streamlit model deployment example",
+
+    # 12. Libraries & Ecosystem
+    "hugging face": "huggingface transformers datasets accelerate tutorial",
+    "langchain": "langchain chatbot rag tutorial examples",
+    "fastai & pytorch lightning": "fastai pytorch lightning tutorial notebook",
+
+    # 13. Domain Applications
+    "recommender systems": "recommender system collaborative filtering tutorial",
+    "healthcare ai": "medical imaging machine learning tutorial",
+    "finance ai": "fraud detection stock prediction machine learning tutorial",
+
+    # 14. Fun & Exploration
+    "ai playground": "gradio streamlit demo interactive machine learning",
+    "creative ai": "magenta music ai art generation tutorial",
+    "ai image fun": "stable diffusion dalle mini image generation fun repo",
+}
+
+def fetch_repos(query, per_topic=5):
+    """Fetch top repos from GitHub search for a given query."""
+    params = {
+        "q": query,
+        "sort": "stars",
+        "order": "desc",
+        "per_page": per_topic
+    }
+    response = requests.get(GITHUB_API_URL, headers=HEADERS, params=params)
+    if response.status_code != 200:
+        print(f"⚠️ Error fetching {query}: {response.json()}")
+        return []
+    return response.json().get("items", [])
+
+def crawl_topics(topics, per_topic=5):
+    """Crawl repos for all topics and return as DataFrame."""
+    results = []
+    for topic, query in topics.items():
+        repos = fetch_repos(query, per_topic)
+        for repo in repos:
+            results.append({
+                "repo_name": repo["name"],                  # just repo name
+                "owner": repo["owner"]["login"],            # owner username
+                "url": repo["html_url"],                    # repo url
+                "stars": repo["stargazers_count"]           # stargazers
+            })
+    return pd.DataFrame(results)
 
 if __name__ == "__main__":
-    crawler = GitHubCrawler()
-    try:
-        crawler.crawl_repos(100000)
-    finally:
-        crawler.close()
+    df = crawl_topics(TOPICS, per_topic=5)
+    df.to_csv("learning_repos.csv", index=False)
+    print("✅ Done! Saved repos to learning_repos.csv")
+    print(df.head(20))

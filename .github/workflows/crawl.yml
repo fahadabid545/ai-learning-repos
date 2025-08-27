@@ -1,10 +1,7 @@
 name: GitHub Crawler
 
 on:
-  push:                # 🚀 Run automatically when pushing to main
-    branches:
-      - main
-  workflow_dispatch:   # ✅ Still allow manual trigger from Actions tab (if available)
+  workflow_dispatch:   # ✅ Manual trigger only from Actions tab
 
 jobs:
   crawl:
