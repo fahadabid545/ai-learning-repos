@@ -53,7 +53,7 @@ jobs:
 
       - name: Dump DB to CSV
         run: |
-          psql -h localhost -U postgres -d postgres -c "\COPY repos TO 'repos.csv' CSV HEADER"
+          psql -h localhost -U postgres -d postgres -c "\COPY repos TO '${{ github.workspace }}/repos.csv' CSV HEADER"
           ls -lah
         env:
           PGPASSWORD: postgres
@@ -62,4 +62,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: repos-data
-          path: repos.csv
+          path: ${{ github.workspace }}/repos.csv
