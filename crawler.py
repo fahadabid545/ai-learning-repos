@@ -1,13 +1,25 @@
 # crawler.py
+import os
 import requests
 import pandas as pd
+import logging
+from time import sleep
+from typing import List, Dict, Any
 
+# -------------------- CONFIG --------------------
 GITHUB_API_URL = "https://api.github.com/search/repositories"
-TOKEN = None  # 🔑 Add your GitHub token for higher rate limits
+TOKEN = os.getenv("GITHUB_TOKEN")  # 🔑 Set in GitHub Actions or local env
 HEADERS = {"Authorization": f"token {TOKEN}"} if TOKEN else {}
+OUTPUT_FILE = "learning_repos.csv"
 
-# 🎯 Refined topics → queries
-TOPICS = {
+# Logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+
+# -------------------- TOPICS --------------------
+TOPICS: Dict[str, str] = {
     # 1. Math & Foundations
     "math for ai": "linear algebra OR calculus OR probability OR optimization tutorial notebook",
 
@@ -65,36 +77,56 @@ TOPICS = {
     "ai image fun": "stable diffusion dalle mini image generation fun repo",
 }
 
-def fetch_repos(query, per_topic=5):
-    """Fetch top repos from GitHub search for a given query."""
-    params = {
-        "q": query,
-        "sort": "stars",
-        "order": "desc",
-        "per_page": per_topic
-    }
-    response = requests.get(GITHUB_API_URL, headers=HEADERS, params=params)
-    if response.status_code != 200:
-        print(f"⚠️ Error fetching {query}: {response.json()}")
-        return []
-    return response.json().get("items", [])
+# -------------------- CORE FUNCTIONS --------------------
+def fetch_repos(query: str, per_topic: int = 5, retries: int = 3) -> List[Dict[str, Any]]:
+    """Fetch top repos from GitHub search for a given query with retry logic."""
+    params = {"q": query, "sort": "stars", "order": "desc", "per_page": per_topic}
 
-def crawl_topics(topics, per_topic=5):
+    for attempt in range(retries):
+        response = requests.get(GITHUB_API_URL, headers=HEADERS, params=params)
+
+        if response.status_code == 200:
+            return response.json().get("items", [])
+
+        logging.warning(
+            f"⚠️ Error fetching {query} (status {response.status_code}). "
+            f"Attempt {attempt+1}/{retries}."
+        )
+        sleep(2 * (attempt + 1))  # exponential backoff
+
+    logging.error(f"❌ Failed to fetch results for query: {query}")
+    return []
+
+
+def crawl_topics(topics: Dict[str, str], per_topic: int = 5) -> pd.DataFrame:
     """Crawl repos for all topics and return as DataFrame."""
-    results = []
+    results: List[Dict[str, Any]] = []
+
     for topic, query in topics.items():
+        logging.info(f"🔍 Crawling topic: {topic}")
         repos = fetch_repos(query, per_topic)
         for repo in repos:
-            results.append({
-                "repo_name": repo["name"],                  # just repo name
-                "owner": repo["owner"]["login"],            # owner username
-                "url": repo["html_url"],                    # repo url
-                "stars": repo["stargazers_count"]           # stargazers
-            })
-    return pd.DataFrame(results)
+            results.append(
+                {
+                    "topic": topic,
+                    "repo_name": repo["name"],
+                    "owner": repo["owner"]["login"],
+                    "url": repo["html_url"],
+                    "stars": repo["stargazers_count"],
+                }
+            )
 
+    df = pd.DataFrame(results).drop_duplicates(subset=["url"])
+    return df
+
+
+# -------------------- MAIN --------------------
 if __name__ == "__main__":
     df = crawl_topics(TOPICS, per_topic=5)
-    df.to_csv("learning_repos.csv", index=False)
-    print("✅ Done! Saved repos to learning_repos.csv")
-    print(df.head(20))
+
+    if df.empty:
+        logging.warning("⚠️ No repositories found.")
+    else:
+        df.to_csv(OUTPUT_FILE, index=False)
+        logging.info(f"✅ Done! Saved {len(df)} repos to {OUTPUT_FILE}")
+        print(df.head(20))
