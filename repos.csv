@@ -1,5 +1,5 @@
 topic,name,owner,url,stars,description
-python,project-based-learning,practical-tutorials,https://github.com/practical-tutorials/project-based-learning,241502,Curated list of project-based tutorials
+python,project-based-learning,practical-tutorials,https://github.com/practical-tutorials/project-based-learning,241501,Curated list of project-based tutorials
 python,100-Days-Of-ML-Code,Avik-Jain,https://github.com/Avik-Jain/100-Days-Of-ML-Code,48051,100 Days of ML Coding
 python,TensorFlow-Examples,aymericdamien,https://github.com/aymericdamien/TensorFlow-Examples,43701,TensorFlow Tutorial and Examples for Beginners (support TF v1 & v2)
 python,100-Days-Of-ML-Code,MLEveryday,https://github.com/MLEveryday/100-Days-Of-ML-Code,21944,100-Days-Of-ML-Code中文版
@@ -19,7 +19,7 @@ machine-learning,machine_learning_examples,lazyprogrammer,https://github.com/laz
 machine-learning,catboost,catboost,https://github.com/catboost/catboost,8545,"A fast, scalable, high performance Gradient Boosting on Decision Trees library, used for ranking, classification, regression and other machine learning tasks for Python, R, Java, C++. Supports computation on CPU and GPU."
 machine-learning,awesome-youtubers,JoseDeFreitas,https://github.com/JoseDeFreitas/awesome-youtubers,6823,"An awesome list of awesome YouTubers that teach about technology. Tutorials about web development, computer science, machine learning, game development, cybersecurity, and more."
 machine-learning,have-fun-with-machine-learning,humphd,https://github.com/humphd/have-fun-with-machine-learning,5111,An absolute beginner's guide to Machine Learning and Image Classification with Neural Networks
-deep-learning,annotated_deep_learning_paper_implementations,labmlai,https://github.com/labmlai/annotated_deep_learning_paper_implementations,62846,"🧑‍🏫 60+ Implementations/tutorials of deep learning papers with side-by-side notes 📝; including transformers (original, xl, switch, feedback, vit, ...), optimizers (adam, adabelief, sophia, ...), gans(cyclegan, stylegan2, ...), 🎮 reinforcement learning (ppo, dqn), capsnet, distillation, ... 🧠"
+deep-learning,annotated_deep_learning_paper_implementations,labmlai,https://github.com/labmlai/annotated_deep_learning_paper_implementations,62847,"🧑‍🏫 60+ Implementations/tutorials of deep learning papers with side-by-side notes 📝; including transformers (original, xl, switch, feedback, vit, ...), optimizers (adam, adabelief, sophia, ...), gans(cyclegan, stylegan2, ...), 🎮 reinforcement learning (ppo, dqn), capsnet, distillation, ... 🧠"
 deep-learning,pytorch-tutorial,yunjey,https://github.com/yunjey/pytorch-tutorial,31663,PyTorch Tutorial for Deep Learning Researchers
 deep-learning,awesome-deep-learning,ChristosChristofidis,https://github.com/ChristosChristofidis/awesome-deep-learning,26081,"A curated list of awesome Deep Learning tutorials, projects and communities."
 deep-learning,Machine-Learning-Tutorials,ujjwalkarn,https://github.com/ujjwalkarn/Machine-Learning-Tutorials,16605,"machine learning and deep learning tutorials, articles and other resources "
