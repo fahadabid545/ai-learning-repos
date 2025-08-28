@@ -1,12 +1,12 @@
 name: GitHub Crawler
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:         # ✅ allow manual runs from Actions tab
   schedule:
-    - cron: "0 12 * * 1"
+    - cron: "0 12 * * 1"     # ✅ run every Monday at 12:00 UTC
 
 permissions:
-  contents: write   # ✅ allow pushing changes
+  contents: write            # ✅ allow pushing changes
 
 jobs:
   crawl:
@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}   # ✅ use built-in token
-          fetch-depth: 0                       # needed for commits
+          fetch-depth: 0                       # ✅ needed for commits & rebase
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,19 +32,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python crawler.py
 
-      - name: Commit repos.csv
+      - name: Commit and push repos.csv
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
+          # stage repos.csv if changed
           git add repos.csv
           if git diff --cached --quiet; then
             echo "⚠️ No changes in repos.csv"
             exit 0
           fi
-          
-          git commit -m "chore: update repos.csv [skip ci]"
 
-          # ✅ make sure we are up-to-date before pushing
-          git pull --rebase origin ${GITHUB_REF#refs/heads/}
-          git push origin HEAD:${GITHUB_REF#refs/heads/}
+          git commit -m "chore: update repos.csv [skip ci]" || echo "No changes to commit"
+
+          # ✅ always rebase to avoid conflicts
+          git pull --rebase origin ${GITHUB_REF#refs/heads/} || true
+          git push origin HEAD:${GITHUB_REF#refs/heads/} || true
