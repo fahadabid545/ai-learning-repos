@@ -1,4 +1,3 @@
-# crawler.py
 import requests
 import pandas as pd
 import time, random
@@ -77,7 +76,7 @@ MIN_STARS_BY_TOPIC = {
 LEARNING_KEYWORDS = ["tutorial", "course", "learn", "guide", "examples", "notebooks"]
 PLAYGROUND_KEYWORDS = ["playground", "interactive", "notebook", "hands-on"]
 
-def fetch_repos(query: str, per_page: int = 20):
+def fetch_repos(query: str, per_page: int = 5):  # 🔹 only fetch 5 repos per query
     params = {
         "q": f"{query} in:name,description,readme fork:false",
         "sort": "stars",
@@ -115,11 +114,16 @@ def filter_repo(repo, topic):
 
 def crawl_all():
     all_repos = []
-    seen_urls = set()
 
     for topic, queries in TOPIC_QUERIES.items():
         print(f"\n🔎 Crawling topic: {topic}")
+        seen_urls = set()
+        topic_repos = []
+
         for q in queries:
+            if len(topic_repos) >= 5:  # ✅ stop once 5 repos collected for this topic
+                break
+
             repos = fetch_repos(q)
             for repo in repos:
                 if not filter_repo(repo, topic):
@@ -130,7 +134,7 @@ def crawl_all():
                     continue
                 seen_urls.add(url)
 
-                all_repos.append({
+                topic_repos.append({
                     "topic": topic,
                     "name": repo.get("name"),
                     "full_name": repo.get("full_name"),
@@ -139,12 +143,17 @@ def crawl_all():
                     "description": repo.get("description"),
                 })
 
+                if len(topic_repos) >= 5:  # ✅ cap at 5 per topic
+                    break
+
             time.sleep(2 + random.random() * 3)  # gentle pacing
+
+        all_repos.extend(topic_repos)
 
     # Sort & prioritize
     df = pd.DataFrame(all_repos)
     if not df.empty:
-        df = df.sort_values(by="stars", ascending=False)
+        df = df.sort_values(by=["topic", "stars"], ascending=[True, False])
         df = df[["topic", "name", "full_name", "url", "stars", "description"]]
         df.to_csv("repos.csv", index=False)
         print(f"\n✅ Saved {len(df)} repos to repos.csv")
