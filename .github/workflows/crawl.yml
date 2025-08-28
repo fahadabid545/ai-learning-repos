@@ -1,9 +1,12 @@
 name: GitHub Crawler
 
 on:
-  workflow_dispatch:  # allow manual trigger
+  workflow_dispatch:
   schedule:
-    - cron: "0 12 * * 1"  # run every Monday at 12:00 UTC
+    - cron: "0 12 * * 1"
+
+permissions:
+  contents: write   # ✅ allow pushing changes
 
 jobs:
   crawl:
@@ -12,6 +15,9 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}   # ✅ use built-in token
+          fetch-depth: 0                       # needed for commits
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -19,7 +25,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install requests pandas
+        run: pip install -r requirements.txt
 
       - name: Run crawler
         env:
@@ -30,6 +36,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # only commit if repos.csv changed
           git add repos.csv
-          git commit -m "chore: update repos.csv [skip ci]" || echo "No changes to commit"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes in repos.csv, skipping commit"
+            exit 0
+          fi
+
+          git commit -m "chore: update repos.csv [skip ci]"
+          git push origin HEAD:${GITHUB_REF#refs/heads/}
