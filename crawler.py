@@ -74,7 +74,7 @@ TOPIC_QUERIES = {
     "multimodal-ai": ["multimodal ai tutorial", "vision language models"],
     
     # Dedicated interactive/playground collections
-    "playgrounds": ["ml playground", "ai playground", "rag playground", "langchain playground", "notebooks tutorial"]
+    "playgrounds": ["ml playground", "ai playground", "rag playground", "langchain playground", "notebooks tutorial"],
     "projects": ["machine learning projects", "ai projects for beginners"]
 }
 
