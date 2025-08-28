@@ -11,9 +11,13 @@ HEADERS = {"Authorization": f"token {TOKEN}"} if TOKEN else {}
 # =========================
 # Topics → learning-focused queries
 # =========================
+# =========================
+# Topics → learning-focused queries
+# =========================
 TOPIC_QUERIES = {
     # Foundations
     "python": ["learn python in:name,description,readme", "python tutorial in:name,description,readme", "30 days python"],
+    "r": ["learn R", "R programming tutorial", "R for data science"],
     "numpy": ["numpy tutorial", "learn numpy"],
     "pandas": ["pandas tutorial", "learn pandas", "pandas exercises"],
     "matplotlib-seaborn": ["matplotlib tutorial", "seaborn tutorial", "data viz tutorial"],
@@ -63,19 +67,16 @@ TOPIC_QUERIES = {
     "data-engineering-basics": ["etl tutorial", "data pipeline tutorial"],
     "sql-for-ml": ["sql tutorial beginners data", "learn sql data"],
 
-    
-    # 📌 Latest AI Models & Trends
+    # 📌 Latest AI Models & Trends (no duplicate keys here)
     "transformers": ["transformers tutorial", "huggingface transformers course"],
     "llm": ["large language model tutorial", "learn llm"],
     "chatgpt": ["chatgpt tutorial", "openai chatgpt guide"],
     "diffusion-models": ["diffusion models tutorial", "stable diffusion guide"],
-    "generative-ai": ["generative ai tutorial", "learn generative ai"],
-    "agentic-ai": ["agentic ai tutorial", "learn agentic ai"],
     "multimodal-ai": ["multimodal ai tutorial", "vision language models"],
-    
+
     # Dedicated interactive/playground collections
-    "playgrounds": ["ml playground", "ai playground", "rag playground", "langchain playground", "notebooks tutorial"],
-    "projects": ["machine learning projects", "ai projects for beginners"]
+    "projects": ["machine learning projects", "ai projects for beginners"],
+    "playgrounds": ["ml playground", "ai playground", "rag playground", "langchain playground", "notebooks tutorial"]
 }
 
 # Learning & playground filters
