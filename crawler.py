@@ -19,6 +19,9 @@ TOPIC_QUERIES = {
     "machine-learning": ["machine learning tutorial", "ml course", "learn machine learning"],
     "deep-learning": ["deep learning tutorial", "dl course", "learn deep learning"],
     "keras": ["keras tutorial", "learn keras"],
+    "PyTorch": ["PyTorch tutorial", "learn PyTorch"],
+    "TensorFlow": ["TensorFlow tutorial", "learn TensorFlow"], 
+    "ScikitLearn": ["ScikitLearn tutorial", "learn ScikitLearn"],  
 
     # AI Domains
     "nlp": ["nlp tutorial", "learn nlp", "natural language processing course"],
@@ -27,6 +30,22 @@ TOPIC_QUERIES = {
     "agentic-ai": ["agentic ai tutorial", "learn agentic ai"],
     "rag": ["rag tutorial", "retrieval augmented generation tutorial"],
     "langchain": ["langchain tutorial", "learn langchain"],
+
+    # AI Applications
+    "ai-education": ["ai in education", "education ai tutorial"],
+    "ai-finance": ["ai in finance", "finance ai tutorial"],
+    "ai-manufacturing": ["ai in manufacturing", "manufacturing ai tutorial"],
+    "ai-healthcare": ["ai in healthcare", "healthcare ai tutorial"],
+    "recommendation-systems": ["recommendation systems tutorial", "build recommender system"],
+    "chatbots": ["chatbot tutorial", "learn chatbots", "ai chatbot course"],
+    "ai-security": ["ai in security", "cybersecurity ai tutorial"],
+    "object-detection": ["object detection tutorial", "learn object detection"],
+    "ai-video-surveillance": ["ai video surveillance tutorial", "video analytics ai"],
+    "ai-gaming": ["ai in gaming", "game ai tutorial"],
+    "ai-ethics": ["ai ethics tutorial", "responsible ai"],
+    "face-recognition": ["face recognition tutorial", "facial recognition ai"],
+    "reinforcement-learning": ["reinforcement learning tutorial", "rl course"],
+    "virtual-assistants": ["ai virtual assistants", "voice assistants ai"],
 
     # Latest Models & Tech
     "latest-models": [
@@ -41,6 +60,7 @@ TOPIC_QUERIES = {
         "langchain playground", "notebooks tutorial"
     ]
 }
+
 
 # ⭐ Minimum stars per topic
 MIN_STARS_BY_TOPIC = {
