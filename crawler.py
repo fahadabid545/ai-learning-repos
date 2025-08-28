@@ -11,9 +11,6 @@ HEADERS = {"Authorization": f"token {TOKEN}"} if TOKEN else {}
 # =========================
 # Topics → learning-focused queries
 # =========================
-# =========================
-# Topics → learning-focused queries
-# =========================
 TOPIC_QUERIES = {
     # Foundations
     "python": ["learn python in:name,description,readme", "python tutorial in:name,description,readme", "30 days python"],
@@ -67,7 +64,7 @@ TOPIC_QUERIES = {
     "data-engineering-basics": ["etl tutorial", "data pipeline tutorial"],
     "sql-for-ml": ["sql tutorial beginners data", "learn sql data"],
 
-    # 📌 Latest AI Models & Trends (no duplicate keys here)
+    # 📌 Latest AI Models & Trends
     "transformers": ["transformers tutorial", "huggingface transformers course"],
     "llm": ["large language model tutorial", "learn llm"],
     "chatgpt": ["chatgpt tutorial", "openai chatgpt guide"],
@@ -76,7 +73,7 @@ TOPIC_QUERIES = {
 
     # Dedicated interactive/playground collections
     "projects": ["machine learning projects", "ai projects for beginners"],
-    "playgrounds": ["ml playground", "ai playground", "rag playground", "langchain playground", "notebooks tutorial"]
+    "playgrounds": ["ml playground", "ai playground", "rag playground", "langchain playground", "notebooks tutorial"],
 }
 
 # Learning & playground filters
@@ -84,11 +81,11 @@ LEARNING_KEYWORDS = [
     "learn", "tutorial", "course", "days", "guide", "book",
     "introduction", "from scratch", "roadmap", "curriculum",
     "exercises", "practice", "workshop", "hands-on", "cookbook",
-    "examples", "notebooks", "labs", "bootcamp"
+    "examples", "notebooks", "labs", "bootcamp",
 ]
 
 PLAYGROUND_KEYWORDS = [
-    "playground", "notebook", "colab", "labs", "lab", "demo", "examples", "practice", "interactive"
+    "playground", "notebook", "colab", "labs", "lab", "demo", "examples", "practice", "interactive",
 ]
 
 # Per-topic minimum stars (fallback-friendly for niche tech)
@@ -111,14 +108,11 @@ def min_stars_for(topic: str) -> int:
     return MIN_STARS_BY_TOPIC.get(topic, MIN_STARS_DEFAULT)
 
 def fetch_repos(query: str, per_page: int = 20):
-    # Boost relevance with GitHub qualifiers
-    # - Search in name/description/readme
-    # - Exclude forks for cleaner learning material
     params = {
         "q": f"{query} in:name,description,readme fork:false",
         "sort": "stars",
         "order": "desc",
-        "per_page": per_page
+        "per_page": per_page,
     }
     r = requests.get(GITHUB_API_URL, headers=HEADERS, params=params)
     r.raise_for_status()
@@ -148,11 +142,8 @@ def curate_for_topic(topic: str, queries: list[str], want: int = 5) -> list[dict
             continue
 
         for repo in items:
-            # Popularity gating (topic-aware)
             if repo.get("stargazers_count", 0) < threshold:
                 continue
-
-            # Must be a learning resource
             if not is_learning_repo(repo):
                 continue
 
@@ -162,31 +153,25 @@ def curate_for_topic(topic: str, queries: list[str], want: int = 5) -> list[dict
                 "owner": repo["owner"]["login"],
                 "url": repo["html_url"],
                 "stars": repo["stargazers_count"],
-                "description": repo.get("description") or ""
+                "description": repo.get("description") or "",
             }
             key = unique_key(repo)
             if key in seen:
                 continue
             seen.add(key)
 
-            # Prefer interactive/playground resources
             if is_playground_repo(repo):
                 preferred.append(entry)
             else:
                 normal.append(entry)
 
-            # Early exit if we already have enough (saves rate limit)
             if len(preferred) + len(normal) >= max(want * 2, 12):
                 break
 
-        # be polite to API
         time.sleep(0.6)
-
-        # If we already have plenty, stop early
         if len(preferred) >= want or (len(preferred) + len(normal)) >= want * 2:
             break
 
-    # Fill with playgrounds first, then regular
     curated = preferred[:want]
     if len(curated) < want:
         curated += normal[: (want - len(curated))]
@@ -201,10 +186,7 @@ def main():
             print(f"⚠️ No repos found for topic '{topic}' at current threshold ({min_stars_for(topic)} stars)")
         all_rows.extend(curated)
 
-    # Deduplicate globally by URL (in case same repo appears under multiple topics)
-    dedup = {}
-    for row in all_rows:
-        dedup[row["url"]] = row
+    dedup = {row["url"]: row for row in all_rows}
     rows = list(dedup.values())
 
     df = pd.DataFrame(rows, columns=["topic", "name", "owner", "url", "stars", "description"])
