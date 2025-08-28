@@ -8,13 +8,11 @@ HEADERS = {"Authorization": f"token {TOKEN}"} if TOKEN else {}
 
 # 🎯 Topics → queries
 TOPIC_QUERIES = {
-    # Programming & Data Science
     "python": ["python tutorial", "learn python", "30 days python"],
     "pandas": ["pandas tutorial", "learn pandas"],
     "numpy": ["numpy tutorial", "learn numpy"],
     "r": ["learn r", "r tutorial", "data science with r"],
 
-    # Core AI/ML
     "machine-learning": ["machine learning tutorial", "ml course", "learn machine learning"],
     "deep-learning": ["deep learning tutorial", "dl course", "learn deep learning"],
     "keras": ["keras tutorial", "learn keras"],
@@ -22,7 +20,6 @@ TOPIC_QUERIES = {
     "TensorFlow": ["TensorFlow tutorial", "learn TensorFlow"], 
     "ScikitLearn": ["ScikitLearn tutorial", "learn ScikitLearn"],  
 
-    # AI Domains
     "nlp": ["nlp tutorial", "learn nlp", "natural language processing course"],
     "computer-vision": ["computer vision tutorial", "cv course"],
     "generative-ai": ["generative ai tutorial", "learn generative ai"],
@@ -30,7 +27,6 @@ TOPIC_QUERIES = {
     "rag": ["rag tutorial", "retrieval augmented generation tutorial"],
     "langchain": ["langchain tutorial", "learn langchain"],
 
-    # AI Applications
     "ai-education": ["ai in education", "education ai tutorial"],
     "ai-finance": ["ai in finance", "finance ai tutorial"],
     "ai-manufacturing": ["ai in manufacturing", "manufacturing ai tutorial"],
@@ -46,20 +42,17 @@ TOPIC_QUERIES = {
     "reinforcement-learning": ["reinforcement learning tutorial", "rl course"],
     "virtual-assistants": ["ai virtual assistants", "voice assistants ai"],
 
-    # Latest Models & Tech
     "latest-models": [
         "gpt tutorial", "llama tutorial", "mistral tutorial",
         "phi tutorial", "deepseek tutorial", "gemini tutorial",
         "open source llm tutorial"
     ],
 
-    # Playgrounds & Interactive
     "playgrounds": [
         "ml playground", "ai playground", "rag playground",
         "langchain playground", "notebooks tutorial"
     ]
 }
-
 
 # ⭐ Minimum stars per topic
 MIN_STARS_BY_TOPIC = {
@@ -76,7 +69,7 @@ MIN_STARS_BY_TOPIC = {
 LEARNING_KEYWORDS = ["tutorial", "course", "learn", "guide", "examples", "notebooks"]
 PLAYGROUND_KEYWORDS = ["playground", "interactive", "notebook", "hands-on"]
 
-def fetch_repos(query: str, per_page: int = 5):  # 🔹 only fetch 5 repos per query
+def fetch_repos(query: str, per_page: int = 50):  # fetch more repos per query
     params = {
         "q": f"{query} in:name,description,readme fork:false",
         "sort": "stars",
@@ -121,7 +114,7 @@ def crawl_all():
         topic_repos = []
 
         for q in queries:
-            if len(topic_repos) >= 5:  # ✅ stop once 5 repos collected for this topic
+            if len(topic_repos) >= 5:  # stop once 5 repos collected
                 break
 
             repos = fetch_repos(q)
@@ -143,14 +136,17 @@ def crawl_all():
                     "description": repo.get("description"),
                 })
 
-                if len(topic_repos) >= 5:  # ✅ cap at 5 per topic
+                if len(topic_repos) >= 5:  # cap at 5 per topic
                     break
 
-            time.sleep(2 + random.random() * 3)  # gentle pacing
+            time.sleep(1 + random.random() * 2)  # gentle pacing
+
+        if len(topic_repos) < 5:
+            print(f"⚠️ Only found {len(topic_repos)} repos for {topic}")
 
         all_repos.extend(topic_repos)
 
-    # Sort & prioritize
+    # Sort & save
     df = pd.DataFrame(all_repos)
     if not df.empty:
         df = df.sort_values(by=["topic", "stars"], ascending=[True, False])
