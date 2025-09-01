@@ -32,19 +32,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python crawler.py
 
-      - name: Commit and push repos.csv
+      - name: Update README from repos.csv
+        run: python update_readme.py
+
+      - name: Commit and push updates
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # stage repos.csv if changed
-          git add repos.csv
+          git add repos.csv README.md
           if git diff --cached --quiet; then
-            echo "⚠️ No changes in repos.csv"
+            echo "⚠️ No changes to commit"
             exit 0
           fi
 
-          git commit -m "chore: update repos.csv [skip ci]" || echo "No changes to commit"
+          git commit -m "chore: update repos.csv and README [skip ci]" || echo "No changes to commit"
 
           # ✅ always rebase to avoid conflicts
           git pull --rebase origin ${GITHUB_REF#refs/heads/} || true
