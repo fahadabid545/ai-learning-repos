@@ -1,3 +1,4 @@
+# update_readme.py
 import pandas as pd
 
 def update_readme(csv_path="repos.csv", readme_path="README.md"):
@@ -22,7 +23,15 @@ def update_readme(csv_path="repos.csv", readme_path="README.md"):
             columns={"stars": "⭐ Stars"}
         ).sort_values(by="⭐ Stars", ascending=False)
 
-        table_md = topic_df.to_markdown(index=False)
+        try:
+            table_md = topic_df.to_markdown(index=False)  # needs tabulate
+        except ImportError:
+            # fallback: simple markdown table
+            header = " | ".join(topic_df.columns)
+            sep = " | ".join(["---"] * len(topic_df.columns))
+            rows = "\n".join(" | ".join(map(str, row)) for row in topic_df.values)
+            table_md = f"{header}\n{sep}\n{rows}"
+
         section = f"## {topic.capitalize()}\n\n{table_md}\n"
         sections.append(section)
 
@@ -55,3 +64,4 @@ def update_readme(csv_path="repos.csv", readme_path="README.md"):
 
 if __name__ == "__main__":
     update_readme()
+
