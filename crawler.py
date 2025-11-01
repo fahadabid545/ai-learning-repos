@@ -16,8 +16,8 @@ TOPIC_QUERIES = {
 
     "Edge AI": ["Edge Ai tutorial", "learn Edge AI", "Edge AI vs AI"],
     "Quantum AI": ["Quantum AI", "Quantum AI system"],
-    "BLockChain with AI": ["AI inBlockchain tutorial", "Blockchain in AI Course"],
-    "Augmented Reality": ["learn Augmented Reality with AI", "AI Augmented Reality tutorial", "Ai with Augmented Reality"],
+    "BLockChain with AI": ["AI in Blockchain tutorial", "Blockchain in AI Course"],
+    "Augmented Reality With AI": ["learn Augmented Reality with AI", "AI Augmented Reality tutorial", "Ai with Augmented Reality"],
     
     "python": ["python tutorial", "learn python", "30 days python"],
     "pandas": ["pandas tutorial", "learn pandas"],
