@@ -1,10 +1,10 @@
-# crawler.py
+
 """
-GitHub crawler for learning resources (AI / ML / DS).
-- Topic-driven queries (30+ topics included)
-- Candidate pool -> relevance scoring -> star-floor-first selection
-- Email extraction attempts for later notifications
-- Configurable controls and safe defaults
+Faster GitHub crawler for learning resources (trimmed + optimized).
+- Two-stage pipeline (prelim search, then refine top-K with README/topics)
+- Prioritizes highly starred and topically-relevant repos
+- Optional email extraction (lightweight: user public email and README)
+- Reduced network load and tuned defaults for speed
 """
 
 import os
@@ -15,20 +15,22 @@ import re
 import requests
 import pandas as pd
 from typing import Optional, List, Dict
-from difflib import SequenceMatcher
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ---------------------------
 # Config / environment
 # ---------------------------
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 GITHUB_API_URL = "https://api.github.com"
-TOKEN = os.getenv("GITHUB_TOKEN")  # set this in env for higher rate limits
+TOKEN = os.getenv("GITHUB_TOKEN")  # recommended for higher rate limits
 HEADERS = {"Authorization": f"token {TOKEN}"} if TOKEN else {}
-# Use topics preview header when fetching topics
 TOPICS_ACCEPT_HEADER = {"Accept": "application/vnd.github.mercy-preview+json"}
+EMAIL_REGEX = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
-# Topics and example queries (30+ topics). Edit or extend as needed.
-TOPIC_QUERIES = {
+# ---------------------------
+# Topics (mini example — keep your full TOPIC_QUERIES)
+# ---------------------------
+TOPIC_QUERIES: Dict[str, List[str]] = {
     # --- Core Machine Learning & Deep Learning ---
     "machine-learning": ["machine learning tutorial", "learn machine learning", "ml course"],
     "deep-learning": ["deep learning tutorial", "learn deep learning", "dl projects"],
@@ -111,49 +113,44 @@ TOPIC_QUERIES = {
     "notebooks-collections": ["awesome notebooks ai", "colab tutorial", "jupyter examples"],
 }
 
-# Per-topic minimum stars preference (adjust per your taste). Topics not listed use 'default'.
+
+# Per-topic minimum stars preference (tweakable)
 MIN_STARS_BY_TOPIC = {
     "generative-ai": 200,
     "transformers": 150,
     "langchain": 100,
-    "retrieval-augmented-generation": 100,
-    "pytorch": 100,
-    "tensorflow": 100,
-    "deep-learning": 150,
-    "machine-learning": 150,
-    "mlops": 100,
     "default": 30,
 }
-
-# Keyword hints (used implicitly by tokenizing topic & queries)
-LEARNING_KEYWORDS = ["tutorial", "course", "learn", "guide", "examples", "notebooks", "examples"]
-PLAYGROUND_KEYWORDS = ["playground", "interactive", "notebook", "hands-on", "demo"]
 
 # ---------------------------
 # Controls (tweak when experimenting)
 # ---------------------------
-PER_PAGE = 100                # GitHub allowed max per page
-MAX_PER_TOPIC = 5             # how many final repos per topic you want
-CANDIDATE_POOL_LIMIT = 300    # how many candidates to collect before scoring
-MAX_PAGES_PER_QUERY = 3       # pages per query to fetch
-FETCH_README = True           # expensive but improves relevance
-FETCH_TOPICS = True           # fetch repo topics (needs token)
-REQUEST_PAUSE = 1.0           # base pause between requests
-DRY_RUN = True                # set False only when you're ready to write / notify
+PER_PAGE = 50                # smaller page for faster responses
+MAX_PER_TOPIC = 5            # final repos per topic
+CANDIDATE_POOL_LIMIT = 120   # candidate pool size per topic
+MAX_PAGES_PER_QUERY = 2      # pages per single query
+REFINE_TOP_K = 20            # only refine top-K candidates with README/topics
+MAX_WORKERS = 8              # concurrency for README/topic fetches
+FETCH_README = True          # fetch README during refinement
+FETCH_TOPICS = True          # fetch repo topics during refinement (requires token)
+REQUEST_PAUSE = 0.45         # small pause between search requests
+DRY_RUN = True               # True => writes repos_selected_dryrun.csv
+EMAIL_EXTRACTION = False     # Set True only if you need contact emails (adds requests)
 
 # ---------------------------
-# Helpers & session
+# Session setup
 # ---------------------------
 session = requests.Session()
 if HEADERS:
     session.headers.update(HEADERS)
 session.headers.update({"Accept": "application/vnd.github.v3+json"})
 
-EMAIL_REGEX = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-
+# ---------------------------
+# Networking helpers
+# ---------------------------
 def safe_get(url, headers=None, params=None, attempts=3, timeout=15):
     headers = headers or session.headers
-    for i in range(attempts):
+    for attempt in range(attempts):
         try:
             r = requests.get(url, headers=headers, params=params, timeout=timeout)
             if r.status_code == 200:
@@ -164,25 +161,38 @@ def safe_get(url, headers=None, params=None, attempts=3, timeout=15):
                     wait = max(int(reset) - int(time.time()), 1)
                     print(f"Rate limited. Sleeping {wait}s (reset).")
                     time.sleep(wait)
+                    continue
                 else:
-                    sleep = 10 * (2 ** i)
-                    print(f"Rate limited. Sleeping {sleep}s.")
+                    sleep = 2 ** (attempt + 2)
+                    print(f"Rate limited without reset header. Sleeping {sleep}s.")
                     time.sleep(sleep)
-            else:
-                # small backoff on other failures
-                time.sleep(2 * (i + 1))
+                    continue
+            # for other 4xx/5xx, retry with backoff
+            sleep = 1.5 * (attempt + 1)
+            print(f"HTTP {r.status_code} for {url}. Sleeping {sleep}s then retry.")
+            time.sleep(sleep)
         except Exception as e:
-            print("Request error:", e)
-            time.sleep(2 * (i + 1))
+            sleep = 1.5 * (attempt + 1)
+            print(f"Request error: {e}. Sleeping {sleep}s then retry.")
+            time.sleep(sleep)
     return None
 
 # ---------------------------
 # Fetching helpers
 # ---------------------------
+def build_search_query(q_text: str, min_stars: int = 0) -> str:
+    """
+    Build a compact GitHub search query string.
+    We include: text in name/description/readme and optional stars floor.
+    """
+    q = f'"{q_text}" in:name,description,readme fork:false'
+    if min_stars and min_stars > 0:
+        q += f' stars:>={min_stars}'
+    return q
+
 def fetch_repos(query: str, per_page: int = PER_PAGE, page: int = 1):
-    q = query if '"' in query else f'"{query}"'
     params = {
-        "q": f"{q} in:name,description,readme fork:false",
+        "q": query,
         "sort": "stars",
         "order": "desc",
         "per_page": per_page,
@@ -199,6 +209,7 @@ def fetch_readme_raw(full_name: str) -> Optional[str]:
     headers["Accept"] = "application/vnd.github.v3.raw"
     r = safe_get(url, headers=headers)
     if r:
+        # keep lowercase for faster keyword checks later
         return r.text.lower()
     return None
 
@@ -213,7 +224,9 @@ def fetch_repo_topics(full_name: str) -> List[str]:
         return r.json().get("names", [])
     return []
 
-# Email extraction helpers
+# ---------------------------
+# Email extraction (lightweight)
+# ---------------------------
 def get_public_email_from_user(username: str) -> Optional[str]:
     url = f"{GITHUB_API_URL}/users/{username}"
     r = safe_get(url)
@@ -227,44 +240,25 @@ def get_email_from_readme(full_name: str) -> Optional[str]:
     text = fetch_readme_raw(full_name)
     if not text:
         return None
+    m = EMAIL_REGEX.search(text)
+    if m:
+        return m.group(0)
+    # check mailto:
     mailto = re.search(r"mailto:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})", text, re.IGNORECASE)
     if mailto:
         return mailto.group(1)
-    plain = EMAIL_REGEX.search(text)
-    if plain:
-        return plain.group(0)
-    return None
-
-def get_email_from_commits(full_name: str, max_commits: int = 5) -> Optional[str]:
-    url = f"{GITHUB_API_URL}/repos/{full_name}/commits"
-    r = safe_get(url, params={"per_page": max_commits})
-    if r:
-        commits = r.json()
-        for c in commits:
-            commit_obj = c.get("commit", {})
-            author = commit_obj.get("author", {})
-            if author:
-                email = author.get("email")
-                if email and EMAIL_REGEX.search(email):
-                    if "noreply.github" in email.lower():
-                        continue
-                    return email
     return None
 
 def extract_contact_email(full_name: str, owner_username: str) -> Optional[str]:
-    # Try user profile, then readme, then commits, then blog field
+    # lightweight: public user email -> README email -> blog fallback
     email = get_public_email_from_user(owner_username)
     if email:
         return email
-    time.sleep(0.12)
+    time.sleep(0.08)
     email = get_email_from_readme(full_name)
     if email:
         return email
-    time.sleep(0.12)
-    email = get_email_from_commits(full_name)
-    if email:
-        return email
-    # blog fallback
+    # fallback to blog url on user profile (rare)
     url = f"{GITHUB_API_URL}/users/{owner_username}"
     r = safe_get(url)
     if r:
@@ -275,8 +269,11 @@ def extract_contact_email(full_name: str, owner_username: str) -> Optional[str]:
     return None
 
 # ---------------------------
-# Relevance scoring
+# Simple scoring helpers
 # ---------------------------
+def log_scale_stars(stars: int) -> float:
+    return min(1.0, math.log10(max(1, stars)) / 3.0)
+
 def tokenize(text: str) -> List[str]:
     if not text:
         return []
@@ -286,144 +283,139 @@ def keywords_from_topic(topic: str, queries: List[str]) -> List[str]:
     tokens = set(tokenize(topic))
     for q in queries:
         tokens.update(tokenize(q))
-    # remove trivial tokens and common stop-like words if needed
     return sorted(tokens)
 
-def fuzzy_similarity(a: str, b: str) -> float:
-    if not a or not b:
+def fuzz_match_score(text_blob: str, keywords: List[str]) -> float:
+    if not text_blob:
         return 0.0
-    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+    hits = sum(1 for k in keywords if k and k in text_blob)
+    return min(1.0, hits / max(1, len(keywords)))
 
-def log_scale_stars(stars: int) -> float:
-    return min(1.0, math.log10(max(1, stars)) / 3.0)
-
-def score_repo(repo: dict, topic: str, queries: List[str], readme_text: Optional[str], repo_topics: List[str]) -> float:
+def prelim_score_repo(repo: dict, keywords: List[str]) -> float:
     name = (repo.get("name") or "").lower()
     full_name = (repo.get("full_name") or "").lower()
     desc = (repo.get("description") or "") or ""
     desc_low = desc.lower()
-    readme_text = readme_text or ""
-    stars = repo.get("stargazers_count", 0)
-    min_stars = MIN_STARS_BY_TOPIC.get(topic, MIN_STARS_BY_TOPIC.get("default", 0))
-
-    keywords = keywords_from_topic(topic, queries)
-    text_blob = " ".join([name, full_name, desc_low, readme_text])
-
-    # keyword count (simple)
-    keyword_hits = sum(text_blob.count(k) for k in keywords)
-
-    # fuzzy similarity
-    fuzzy_score = max(
-        fuzzy_similarity(topic, name),
-        fuzzy_similarity(topic, full_name),
-        fuzzy_similarity(topic, desc_low),
-        fuzzy_similarity(topic, readme_text[:400] if readme_text else "")
-    )
-
-    # topics match
-    repo_topics_lower = [t.lower() for t in (repo_topics or [])]
-    topic_matches = sum(1 for k in keywords if k in repo_topics_lower)
-
-    # stars signal
-    stars_score = log_scale_stars(stars)
-
-    # composite score with weights (tweakable)
-    score = (
-        (0.50 * (0.2 * keyword_hits + 0.8 * fuzzy_score)) +  # textual match & fuzzy
-        (0.25 * stars_score) +                                # popularity
-        (0.20 * (topic_matches / max(1, len(keywords)))) +   # topic tag presence
-        (0.05 * (1.0 if topic.lower() in text_blob else 0.0)) # literal mention boost
-    )
-
-    # penalty for forks
+    stars_score = log_scale_stars(repo.get("stargazers_count", 0))
+    blob = " ".join([name, full_name, desc_low])
+    keyword_score = fuzz_match_score(blob, keywords)
+    # weighted: keywords first, but stars matter
+    score = 0.7 * keyword_score + 0.3 * stars_score
     if repo.get("fork"):
-        score *= 0.75
+        score *= 0.9
+    return float(score)
 
-    # slight boost if repo meets min_stars
-    if stars >= min_stars:
-        score *= 1.06
-
+def refined_score_repo(repo: dict, keywords: List[str], readme_text: Optional[str], repo_topics: List[str]) -> float:
+    name = (repo.get("name") or "").lower()
+    full_name = (repo.get("full_name") or "").lower()
+    desc_low = (repo.get("description") or "") or ""
+    readme_sample = (readme_text or "")[:4000]
+    blob = " ".join([name, full_name, desc_low, readme_sample])
+    keyword_score = fuzz_match_score(blob, keywords)
+    topic_matches = 0
+    if repo_topics:
+        repo_topics_lower = [t.lower() for t in repo_topics]
+        topic_matches = sum(1 for k in keywords if k in repo_topics_lower)
+        topic_matches = topic_matches / max(1, len(keywords))
+    stars_score = log_scale_stars(repo.get("stargazers_count", 0))
+    score = 0.5 * keyword_score + 0.35 * stars_score + 0.13 * topic_matches
+    if repo.get("fork"):
+        score *= 0.85
     return float(score)
 
 # ---------------------------
-# Selection logic (star-floor-first)
+# Parallel fetching for refinement
+# ---------------------------
+def _fetch_readme_and_topics_single(full_name: str) -> dict:
+    readme = None
+    topics = []
+    try:
+        if FETCH_README:
+            readme = fetch_readme_raw(full_name)
+    except Exception:
+        readme = None
+    if FETCH_TOPICS and TOKEN:
+        try:
+            topics = fetch_repo_topics(full_name)
+        except Exception:
+            topics = []
+    return {"readme": readme, "topics": topics}
+
+def fetch_readme_and_topics_parallel(full_names: List[str]) -> dict:
+    out = {}
+    if not full_names:
+        return out
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as exe:
+        futures = {exe.submit(_fetch_readme_and_topics_single, full): full for full in full_names}
+        for fut in as_completed(futures):
+            full = futures[fut]
+            try:
+                out_val = fut.result()
+            except Exception:
+                out_val = {"readme": None, "topics": []}
+            out[full] = out_val
+            # tiny jitter to avoid bursts
+            time.sleep(0.01 + random.random() * 0.03)
+    return out
+
+# ---------------------------
+# Selection logic
 # ---------------------------
 def select_top_by_stars_and_score(candidate_pool: List[dict], topic: str, max_per_topic: int = MAX_PER_TOPIC) -> List[dict]:
     topic_min_stars = MIN_STARS_BY_TOPIC.get(topic, MIN_STARS_BY_TOPIC.get("default", 0))
-
     meets_floor = [c for c in candidate_pool if (c["repo"].get("stargazers_count", 0) or 0) >= topic_min_stars]
     below_floor = [c for c in candidate_pool if (c["repo"].get("stargazers_count", 0) or 0) < topic_min_stars]
 
-    # sort meets by stars desc then score desc
     meets_floor.sort(key=lambda x: (x["repo"].get("stargazers_count", 0), x["score"]), reverse=True)
     below_floor.sort(key=lambda x: x["score"], reverse=True)
 
     top_picks = []
-    # fill from meets_floor first
     for c in meets_floor:
         if len(top_picks) >= max_per_topic:
             break
         top_picks.append(c)
-
-    # backfill from best-scored below-floor if needed
     if len(top_picks) < max_per_topic:
         needed = max_per_topic - len(top_picks)
         top_picks.extend(below_floor[:needed])
 
-    print(f"Topic '{topic}': {len(meets_floor)} >= {topic_min_stars} stars; selected {len(top_picks)} (need {max_per_topic}) from pool {len(candidate_pool)}")
+    print(f"Topic '{topic}': {len(meets_floor)} >= {topic_min_stars} stars; selected {len(top_picks)} from pool {len(candidate_pool)}")
     return top_picks
 
 # ---------------------------
-# Main crawl
+# Main crawl (two-stage)
 # ---------------------------
 def crawl_all():
     all_selected = []
-
     for topic, queries in TOPIC_QUERIES.items():
         print("\n" + "="*60)
         print(f"🔎 Crawling topic: {topic}")
         candidate_pool = []
         seen = set()
 
+        # Prepare keywords (used for scoring)
+        keywords = keywords_from_topic(topic, queries)
+
+        # Stage A: cheap collection + prelim scoring
+        topic_min_stars = MIN_STARS_BY_TOPIC.get(topic, MIN_STARS_BY_TOPIC.get("default", 0))
         for q in queries:
             page = 1
+            # build a lean search query that asks GitHub to filter by stars when possible
+            query_str = build_search_query(q, min_stars=topic_min_stars if topic_min_stars >= 50 else 0)
             while page <= MAX_PAGES_PER_QUERY:
-                repos = fetch_repos(q, per_page=PER_PAGE, page=page)
+                repos = fetch_repos(query_str, per_page=PER_PAGE, page=page)
                 if not repos:
                     break
-
                 for repo in repos:
-                    url = repo.get("html_url")
-                    if not url or url in seen:
+                    full_name = repo.get("full_name")
+                    if not full_name or full_name in seen:
                         continue
+                    seen.add(full_name)
                     if len(candidate_pool) >= CANDIDATE_POOL_LIMIT:
                         break
-
-                    seen.add(url)
-                    owner = repo.get("owner", {}).get("login")
-                    full_name = repo.get("full_name")
-
-                    # fetch README & topics if toggled (careful with rate limits)
-                    readme = None
-                    if FETCH_README:
-                        time.sleep(0.2 + random.random() * 0.3)
-                        readme = fetch_readme_raw(full_name)
-
-                    repo_topics = []
-                    if FETCH_TOPICS and TOKEN:
-                        time.sleep(0.12 + random.random() * 0.25)
-                        repo_topics = fetch_repo_topics(full_name)
-
-                    s = score_repo(repo, topic, queries, readme, repo_topics)
-                    candidate_pool.append({
-                        "repo": repo,
-                        "score": s,
-                        "readme": readme,
-                        "repo_topics": repo_topics
-                    })
-
+                    s_prelim = prelim_score_repo(repo, keywords)
+                    candidate_pool.append({"repo": repo, "prelim_score": s_prelim})
                 page += 1
-                time.sleep(REQUEST_PAUSE + random.random() * 0.8)
+                time.sleep(REQUEST_PAUSE + random.random() * 0.25)
                 if len(candidate_pool) >= CANDIDATE_POOL_LIMIT:
                     break
 
@@ -431,17 +423,41 @@ def crawl_all():
             print(f"⚠️ No candidates for topic {topic}")
             continue
 
-        # select top picks using star-floor-first logic
-        top_picks = select_top_by_stars_and_score(candidate_pool, topic, MAX_PER_TOPIC)
+        # Stage B: refine top-K candidates with README/topics (parallel)
+        candidate_pool.sort(key=lambda x: x["prelim_score"], reverse=True)
+        top_k = candidate_pool[:REFINE_TOP_K]
+        full_names = [c["repo"]["full_name"] for c in top_k]
+        fetched = fetch_readme_and_topics_parallel(full_names)
+
+        refined_pool = []
+        for c in top_k:
+            repo = c["repo"]
+            full_name = repo.get("full_name")
+            readme_text = fetched.get(full_name, {}).get("readme")
+            repo_topics = fetched.get(full_name, {}).get("topics", [])
+            refined_s = refined_score_repo(repo, keywords, readme_text, repo_topics)
+            refined_pool.append({"repo": repo, "score": refined_s, "readme": readme_text, "repo_topics": repo_topics})
+
+        # If refined_pool is small, fill with next-best prelim candidates (without README)
+        if len(refined_pool) < REFINE_TOP_K and len(candidate_pool) > REFINE_TOP_K:
+            for c in candidate_pool[REFINE_TOP_K:REFINE_TOP_K + (REFINE_TOP_K - len(refined_pool))]:
+                refined_pool.append({"repo": c["repo"], "score": c["prelim_score"], "readme": None, "repo_topics": []})
+
+        # Final selection using star-floor-first logic
+        top_picks = select_top_by_stars_and_score(refined_pool, topic, MAX_PER_TOPIC)
 
         for entry in top_picks:
             repo = entry["repo"]
             owner = repo.get("owner", {}).get("login")
             full_name = repo.get("full_name")
-
-            # extract contact email (non-invasive attempts)
-            email = extract_contact_email(full_name, owner)
-
+            email = ""
+            if EMAIL_EXTRACTION:
+                # optional and comparatively expensive
+                try:
+                    email = extract_contact_email(full_name, owner) or ""
+                except Exception:
+                    email = ""
+                time.sleep(0.08)
             selected = {
                 "topic": topic,
                 "name": repo.get("name"),
@@ -449,20 +465,18 @@ def crawl_all():
                 "url": repo.get("html_url"),
                 "stars": repo.get("stargazers_count", 0),
                 "description": repo.get("description"),
-                "score": entry["score"],
-                "email": email or "",
+                "score": entry.get("score"),
+                "email": email,
                 "repo_topics": ",".join(entry.get("repo_topics", []))
             }
             all_selected.append(selected)
             print(f" + Selected: {selected['full_name']}  ⭐ {selected['stars']}  score={selected['score']:.3f}  email={selected['email'] or 'N/A'}")
 
-    # save results
+    # Save CSV
     df = pd.DataFrame(all_selected)
     if not df.empty:
         df = df.sort_values(by=["topic", "stars", "score"], ascending=[True, False, False])
-        out_file = "repos_selected.csv"
-        if DRY_RUN:
-            out_file = "repos_selected_dryrun.csv"
+        out_file = "repos_selected_dryrun.csv" if DRY_RUN else "repos_selected.csv"
         df.to_csv(out_file, index=False)
         print(f"\n✅ Saved {len(df)} selected repos to {out_file}")
     else:
