@@ -8,6 +8,17 @@ HEADERS = {"Authorization": f"token {TOKEN}"} if TOKEN else {}
 
 # 🎯 Topics → queries
 TOPIC_QUERIES = {
+
+    "MCP": ["MCP tutorial", "learn MCP", "MCP and AI"],
+    "Expert Systems": ["Expert systems", "AI Expert system"],
+    "Robotic Process Automation (RPA)": ["Robotic Process Automation tutorial", "Robotic Process Automation Course"],
+    "Reactive Machines": ["learn Reactive Machines", "Reactive Machines tutorial", "Ai with Reactive Machines"],
+
+    "Edge AI": ["Edge Ai tutorial", "learn Edge AI", "Edge AI vs AI"],
+    "Quantum AI": ["Quantum AI", "Quantum AI system"],
+    "BLockChain with AI": ["AI inBlockchain tutorial", "Blockchain in AI Course"],
+    "Augmented Reality": ["learn Augmented Reality with AI", "AI Augmented Reality tutorial", "Ai with Augmented Reality"],
+    
     "python": ["python tutorial", "learn python", "30 days python"],
     "pandas": ["pandas tutorial", "learn pandas"],
     "numpy": ["numpy tutorial", "learn numpy"],
