@@ -1,489 +1,366 @@
-
 """
-Faster GitHub crawler for learning resources (trimmed + optimized).
-- Two-stage pipeline (prelim search, then refine top-K with README/topics)
-- Prioritizes highly starred and topically-relevant repos
-- Optional email extraction (lightweight: user public email and README)
-- Reduced network load and tuned defaults for speed
-"""
+Improved GitHub crawler for learning resources.
 
-import os
-import time
-import math
-import random
+Features:
+- ~50 sensible topics
+- stronger relevance filtering using repo details + README content
+- tries to extract owner email (owner profile first, then README)
+- returns top 5 starred repos per topic
+- gentle pacing + basic retry/backoff
+- minimal & focused
+"""
+import base64
+import json
 import re
+import time
+import random
+from typing import List, Dict, Optional
+
 import requests
 import pandas as pd
-from typing import Optional, List, Dict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# ---------------------------
-# Config / environment
-# ---------------------------
-GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
-GITHUB_API_URL = "https://api.github.com"
-TOKEN = os.getenv("GITHUB_TOKEN")  # recommended for higher rate limits
-HEADERS = {"Authorization": f"token {TOKEN}"} if TOKEN else {}
-TOPICS_ACCEPT_HEADER = {"Accept": "application/vnd.github.mercy-preview+json"}
-EMAIL_REGEX = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# ---------- CONFIG ----------
+GITHUB_API_SEARCH = "https://api.github.com/search/repositories"
+GITHUB_API_REPO = "https://api.github.com/repos/{full_name}"
+GITHUB_API_USER = "https://api.github.com/users/{login}"
+GITHUB_API_README = "https://api.github.com/repos/{full_name}/readme"
 
-# ---------------------------
-# Topics (mini example — keep your full TOPIC_QUERIES)
-# ---------------------------
-TOPIC_QUERIES: Dict[str, List[str]] = {
-    # --- Core Machine Learning & Deep Learning ---
-    "machine-learning": ["machine learning tutorial", "learn machine learning", "ml course"],
-    "deep-learning": ["deep learning tutorial", "learn deep learning", "dl projects"],
-    "supervised-learning": ["supervised learning tutorial", "classification regression examples"],
+TOKEN = None  # Optional: set your GitHub token string here for higher rate limits
+HEADERS = {
+    "Accept": "application/vnd.github+json, application/vnd.github.mercy-preview+json"
+}
+if TOKEN:
+    HEADERS["Authorization"] = f"token {TOKEN}"
+
+# tune limits
+PER_PAGE = 50
+MAX_PER_TOPIC_CANDIDATES = 40  # collect candidates, then pick top 5
+TOP_K = 5
+
+EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+# ---------- TOPICS (50+) ----------
+TOPIC_QUERIES = {
+    # 🧠 Core Machine Learning
+    "machine-learning": ["machine learning tutorial", "learn machine learning"],
+    "deep-learning": ["deep learning tutorial", "learn deep learning"],
+    "reinforcement-learning": ["reinforcement learning tutorial", "rl tutorial"],
+    "supervised-learning": ["supervised learning tutorial", "classification tutorial"],
     "unsupervised-learning": ["unsupervised learning tutorial", "clustering tutorial"],
-    "reinforcement-learning": ["reinforcement learning tutorial", "rl projects", "learn reinforcement learning"],
-    "transfer-learning": ["transfer learning tutorial", "fine tuning tutorial", "transfer learning examples"],
-    "meta-learning": ["meta learning tutorial", "few shot learning tutorial"],
+    "transfer-learning": ["transfer learning tutorial", "fine tuning tutorial"],
+    "neural-networks": ["neural networks tutorial", "build neural network"],
+    "optimization-algorithms": ["gradient descent tutorial", "optimization tutorial"],
+    "feature-engineering": ["feature engineering tutorial", "feature selection tutorial"],
+    "model-evaluation": ["model evaluation tutorial", "metrics tutorial"],
 
-    # --- Libraries & Frameworks ---
-    "pytorch": ["pytorch tutorial", "learn pytorch", "pytorch examples"],
-    "tensorflow": ["tensorflow tutorial", "learn tensorflow", "tf projects"],
-    "keras": ["keras tutorial", "learn keras", "keras examples"],
-    "scikit-learn": ["scikit learn tutorial", "scikit-learn course", "learn scikit-learn"],
-    "xgboost": ["xgboost tutorial", "gradient boosting tutorial"],
+    # 🧩 Frameworks & Libraries
+    "pytorch": ["pytorch tutorial", "learn pytorch"],
+    "tensorflow": ["tensorflow tutorial", "learn tensorflow"],
+    "keras": ["keras tutorial", "learn keras"],
+    "scikit-learn": ["scikit learn tutorial", "learn scikit-learn"],
+    "xgboost": ["xgboost tutorial", "learn xgboost"],
     "lightgbm": ["lightgbm tutorial", "learn lightgbm"],
+    "catboost": ["catboost tutorial", "learn catboost"],
+    "huggingface-transformers": ["transformers tutorial", "huggingface tutorial"],
+    "langchain": ["langchain tutorial", "learn langchain"],
+    "fastai": ["fastai tutorial", "learn fastai"],
 
-    # --- Data Science Foundations ---
-    "data-science": ["data science tutorial", "data science course", "learn data science"],
-    "statistics-for-ai": ["statistics for ai tutorial", "probability and statistics tutorial"],
-    "feature-engineering": ["feature engineering tutorial", "data preprocessing tutorial"],
-    "data-visualization": ["data visualization tutorial", "matplotlib seaborn tutorial"],
-    "python-for-data-science": ["python for data science tutorial", "python data projects"],
-    "r-for-data-science": ["r for data science tutorial", "data analysis in r"],
+    # 🧬 Data Science & Analysis
+    "data-science": ["data science tutorial", "learn data science"],
+    "pandas": ["pandas tutorial", "learn pandas"],
+    "numpy": ["numpy tutorial", "learn numpy"],
+    "data-visualization": ["data visualization tutorial", "learn matplotlib"],
+    "matplotlib": ["matplotlib tutorial", "plotting tutorial"],
+    "seaborn": ["seaborn tutorial", "data visualization seaborn"],
+    "plotly": ["plotly tutorial", "interactive plots tutorial"],
+    "statistics": ["statistics tutorial", "probability tutorial"],
+    "data-cleaning": ["data cleaning tutorial", "data preprocessing tutorial"],
+    "exploratory-data-analysis": ["eda tutorial", "exploratory data analysis tutorial"],
 
-    # --- Natural Language Processing (NLP) ---
-    "natural-language-processing": ["nlp tutorial", "learn nlp", "nlp projects"],
-    "transformers": ["transformers tutorial", "huggingface tutorial", "bert gpt tutorial"],
-    "text-summarization": ["text summarization tutorial", "abstractive summarization tutorial"],
-    "sentiment-analysis": ["sentiment analysis tutorial", "text classification tutorial"],
-    "speech-recognition": ["speech recognition tutorial", "voice recognition ai tutorial"],
+    # 💬 Natural Language Processing
+    "nlp": ["nlp tutorial", "natural language processing tutorial"],
+    "text-classification": ["text classification tutorial", "text categorization tutorial"],
+    "sentiment-analysis": ["sentiment analysis tutorial", "emotion detection tutorial"],
+    "named-entity-recognition": ["ner tutorial", "named entity recognition tutorial"],
+    "question-answering": ["qa model tutorial", "question answering tutorial"],
+    "translation-models": ["translation tutorial", "seq2seq translation tutorial"],
+    "summarization": ["text summarization tutorial", "abstractive summarization tutorial"],
+    "generative-ai": ["generative ai tutorial", "learn generative ai"],
+    "llms": ["large language model tutorial", "llm tutorial"],
+    "chatbots": ["chatbot tutorial", "rasa tutorial", "ai chatbot course"],
 
-    # --- Computer Vision ---
-    "computer-vision": ["computer vision tutorial", "learn computer vision", "cv projects"],
-    "object-detection": ["object detection tutorial", "yolo tutorial", "detectron tutorial"],
-    "image-segmentation": ["image segmentation tutorial", "semantic segmentation tutorial"],
-    "face-recognition": ["face recognition tutorial", "facial recognition ai tutorial"],
-    "image-generation": ["image generation tutorial", "diffusion models tutorial"],
+    # 👁️ Computer Vision
+    "computer-vision": ["computer vision tutorial", "learn computer vision"],
+    "image-processing": ["image processing tutorial", "opencv tutorial"],
+    "object-detection": ["object detection tutorial", "yolo tutorial"],
+    "face-recognition": ["face recognition tutorial", "facial recognition ai"],
+    "image-segmentation": ["image segmentation tutorial", "mask rcnn tutorial"],
+    "video-analytics": ["video analytics tutorial", "video ai tutorial"],
+    "image-classification": ["image classification tutorial", "cnn tutorial"],
+    "gesture-recognition": ["gesture recognition tutorial", "hand tracking ai"],
+    "pose-estimation": ["pose estimation tutorial", "openpose tutorial"],
+    "ocr": ["ocr tutorial", "text detection ai"],
 
-    # --- Generative & Large Language Models ---
-    "generative-ai": ["generative ai tutorial", "gpt tutorial", "diffusion models tutorial"],
-    "large-language-models": ["llm tutorial", "gpt fine-tuning tutorial", "open source llm tutorial"],
-    "langchain": ["langchain tutorial", "learn langchain", "langchain examples"],
-    "retrieval-augmented-generation": ["rag tutorial", "retrieval augmented generation tutorial"],
-    "prompt-engineering": ["prompt engineering tutorial", "llm prompting tutorial"],
+    # 🧮 Data Engineering / MLOps
+    "data-engineering": ["data engineering tutorial", "learn data engineering"],
+    "data-pipelines": ["data pipeline tutorial", "etl pipeline tutorial"],
+    "big-data": ["big data tutorial", "spark tutorial"],
+    "apache-spark": ["apache spark tutorial", "pyspark tutorial"],
+    "airflow": ["airflow tutorial", "data workflow tutorial"],
+    "mlops": ["mlops tutorial", "machine learning ops tutorial"],
+    "model-serving": ["model serving tutorial", "api model deployment"],
+    "docker-for-ml": ["docker tutorial", "dockerize ml model"],
+    "kubernetes-ml": ["kubernetes tutorial", "ml kubernetes tutorial"],
+    "model-deployment": ["model deployment tutorial", "deploy model tutorial"],
 
-    # --- MLOps & Deployment ---
-    "mlops": ["mlops tutorial", "mlops pipeline tutorial", "deploy ml models"],
-    "model-deployment": ["model deployment tutorial", "fastapi ml deployment", "docker ml tutorial"],
-    "model-monitoring": ["model monitoring tutorial", "ml model drift tutorial"],
-    "data-versioning": ["data versioning tutorial", "dvc tutorial"],
+    # 🌐 Specialized / Applied AI
+    "recommendation-systems": ["recommender tutorial", "recommendation system tutorial"],
+    "anomaly-detection": ["anomaly detection tutorial", "outlier detection tutorial"],
+    "time-series": ["time series tutorial", "forecasting tutorial"],
+    "forecasting": ["forecasting tutorial", "predictive modeling tutorial"],
+    "ai-in-healthcare": ["ai healthcare tutorial", "healthcare ml tutorial"],
+    "ai-in-finance": ["ai finance tutorial", "fintech ai tutorial"],
+    "ai-in-education": ["ai education tutorial", "education ai tutorial"],
+    "ai-in-manufacturing": ["ai manufacturing tutorial", "industry 4.0 ai"],
+    "ai-in-agriculture": ["ai agriculture tutorial", "farming ai tutorial"],
+    "ai-in-marketing": ["ai marketing tutorial", "marketing analytics ai"],
 
-    # --- Applied AI Fields ---
-    "ai-healthcare": ["ai in healthcare tutorial", "medical ai projects"],
-    "ai-finance": ["ai in finance tutorial", "finance machine learning tutorial"],
-    "ai-education": ["ai in education tutorial", "education ai tutorial"],
-    "ai-manufacturing": ["ai in manufacturing tutorial", "industrial ai tutorial"],
-    "ai-security": ["ai security tutorial", "cybersecurity ai tutorial"],
-    "ai-ethics": ["ai ethics tutorial", "responsible ai tutorial", "explainable ai tutorial"],
+    # 🧠 Advanced / Research Areas
+    "explainable-ai": ["explainable ai tutorial", "xai tutorial"],
+    "causal-inference": ["causal inference tutorial", "causality tutorial"],
+    "bayesian-learning": ["bayesian learning tutorial", "bayesian inference tutorial"],
+    "self-supervised-learning": ["self supervised learning tutorial", "representation learning tutorial"],
+    "semi-supervised-learning": ["semi supervised learning tutorial", "weak supervision tutorial"],
+    "meta-learning": ["meta learning tutorial", "learning to learn tutorial"],
+    "graph-neural-networks": ["gnn tutorial", "graph neural network tutorial"],
+    "attention-mechanisms": ["attention mechanism tutorial", "transformer attention tutorial"],
+    "transformers": ["transformer tutorial", "attention is all you need tutorial"],
+    "vision-transformers": ["vision transformer tutorial", "vit tutorial"],
 
-    # --- Cutting-Edge & Emerging Areas ---
-    "agentic-ai": ["agentic ai tutorial", "autonomous agents tutorial", "crew ai tutorial"],
-    "multi-agent-systems": ["multi agent system tutorial", "ai agents collaboration tutorial"],
-    "edge-ai": ["edge ai tutorial", "tensorflow lite tutorial", "ai on edge devices"],
-    "quantum-ai": ["quantum ai tutorial", "quantum machine learning tutorial"],
-    "blockchain-ai": ["blockchain and ai tutorial", "ai with blockchain tutorial"],
-    "augmented-reality-ai": ["augmented reality ai tutorial", "ar with ai tutorial"],
-    "ai-robotics": ["ai robotics tutorial", "robotic ai control tutorial"],
+    # 🤖 Robotics / Edge / Autonomous
+    "robotics-ai": ["robotics tutorial", "ai robotics tutorial"],
+    "autonomous-systems": ["autonomous systems tutorial", "autonomous vehicles tutorial"],
+    "drone-ai": ["drone ai tutorial", "drone computer vision tutorial"],
+    "edge-ai": ["edge ai tutorial", "tinyml tutorial"],
+    "iot-ai": ["iot ai tutorial", "embedded ai tutorial"],
+    "reinforcement-robots": ["robot reinforcement learning tutorial", "robot control ai"],
+    "path-planning": ["path planning tutorial", "robot navigation tutorial"],
+    "control-systems": ["control systems ai", "pid control tutorial"],
+    "sensor-fusion": ["sensor fusion tutorial", "lidar radar ai"],
+    "sim2real": ["sim2real tutorial", "robotics transfer learning"],
 
-    # --- Specialized Applications ---
-    "recommendation-systems": ["recommendation system tutorial", "recommender tutorial"],
-    "chatbots": ["chatbot tutorial", "rasa tutorial", "dialogflow tutorial"],
-    "virtual-assistants": ["virtual assistant tutorial", "voice assistant ai tutorial"],
-    "ai-gaming": ["game ai tutorial", "ai in gaming tutorial"],
-    "ai-music": ["ai music generation tutorial", "music ai tutorial"],
-    "ai-video-surveillance": ["ai video surveillance tutorial", "video analytics ai tutorial"],
-
-    # --- Tools, Demos & Playgrounds ---
-    "playgrounds": ["ai playground", "ml playground", "interactive notebooks"],
-    "notebooks-collections": ["awesome notebooks ai", "colab tutorial", "jupyter examples"],
+    # ⚙️ Developer Productivity / Fundamentals
+    "python": ["python tutorial", "learn python"],
+    "r": ["r tutorial", "learn r"],
+    "sql": ["sql tutorial", "learn sql for data"],
+    "git": ["git tutorial", "version control tutorial"],
+    "api-development": ["api tutorial", "fastapi tutorial"],
+    "testing-ml": ["ml testing tutorial", "unit testing ml"],
+    "ci-cd": ["ci cd tutorial", "github actions tutorial"],
+    "docker": ["docker tutorial", "container tutorial"],
+    "bash-scripting": ["bash tutorial", "linux scripting tutorial"],
+    "cloud-computing": ["cloud tutorial", "aws gcp azure tutorial"],
 }
 
+# keywords used to quickly identify learning resources
+LEARNING_KEYWORDS = {"tutorial", "guide", "learn", "examples", "notebook", "course", "hands-on", "examples"}
 
-# Per-topic minimum stars preference (tweakable)
-MIN_STARS_BY_TOPIC = {
-    "generative-ai": 200,
-    "transformers": 150,
-    "langchain": 100,
-    "default": 30,
-}
-
-# ---------------------------
-# Controls (tweak when experimenting)
-# ---------------------------
-PER_PAGE = 50                # smaller page for faster responses
-MAX_PER_TOPIC = 5            # final repos per topic
-CANDIDATE_POOL_LIMIT = 120   # candidate pool size per topic
-MAX_PAGES_PER_QUERY = 2      # pages per single query
-REFINE_TOP_K = 20            # only refine top-K candidates with README/topics
-MAX_WORKERS = 8              # concurrency for README/topic fetches
-FETCH_README = True          # fetch README during refinement
-FETCH_TOPICS = True          # fetch repo topics during refinement (requires token)
-REQUEST_PAUSE = 0.45         # small pause between search requests
-DRY_RUN = True               # True => writes repos_selected_dryrun.csv
-EMAIL_EXTRACTION = False     # Set True only if you need contact emails (adds requests)
-
-# ---------------------------
-# Session setup
-# ---------------------------
 session = requests.Session()
-if HEADERS:
-    session.headers.update(HEADERS)
-session.headers.update({"Accept": "application/vnd.github.v3+json"})
+session.headers.update(HEADERS)
 
-# ---------------------------
-# Networking helpers
-# ---------------------------
-def safe_get(url, headers=None, params=None, attempts=3, timeout=15):
-    headers = headers or session.headers
-    for attempt in range(attempts):
-        try:
-            r = requests.get(url, headers=headers, params=params, timeout=timeout)
-            if r.status_code == 200:
-                return r
-            if r.status_code == 403:
-                reset = r.headers.get("X-RateLimit-Reset")
-                if reset:
-                    wait = max(int(reset) - int(time.time()), 1)
-                    print(f"Rate limited. Sleeping {wait}s (reset).")
-                    time.sleep(wait)
-                    continue
-                else:
-                    sleep = 2 ** (attempt + 2)
-                    print(f"Rate limited without reset header. Sleeping {sleep}s.")
-                    time.sleep(sleep)
-                    continue
-            # for other 4xx/5xx, retry with backoff
-            sleep = 1.5 * (attempt + 1)
-            print(f"HTTP {r.status_code} for {url}. Sleeping {sleep}s then retry.")
-            time.sleep(sleep)
-        except Exception as e:
-            sleep = 1.5 * (attempt + 1)
-            print(f"Request error: {e}. Sleeping {sleep}s then retry.")
-            time.sleep(sleep)
+
+# ---------- helpers ----------
+def request_with_retry(url: str, params: dict = None, max_attempts: int = 3) -> Optional[requests.Response]:
+    for attempt in range(max_attempts):
+        r = session.get(url, params=params, timeout=20)
+        if r.status_code == 200:
+            return r
+        if r.status_code == 403:  # rate-limited
+            reset = r.headers.get("X-RateLimit-Reset")
+            if reset:
+                wait = max(int(reset) - int(time.time()), 1)
+            else:
+                wait = 5 * (2 ** attempt)
+            print(f"⏳ Rate limit or blocked. Sleeping {wait}s...")
+            time.sleep(wait)
+            continue
+        # transient errors: small backoff
+        if r.status_code >= 500:
+            time.sleep(2 * (attempt + 1))
+            continue
+        # other errors: break
+        print(f"⚠️ Request failed [{r.status_code}] {url} - {r.text[:200]}")
+        return None
     return None
 
-# ---------------------------
-# Fetching helpers
-# ---------------------------
-def build_search_query(q_text: str, min_stars: int = 0) -> str:
-    """
-    Build a compact GitHub search query string.
-    We include: text in name/description/readme and optional stars floor.
-    """
-    q = f'"{q_text}" in:name,description,readme fork:false'
-    if min_stars and min_stars > 0:
-        q += f' stars:>={min_stars}'
-    return q
 
-def fetch_repos(query: str, per_page: int = PER_PAGE, page: int = 1):
-    params = {
-        "q": query,
-        "sort": "stars",
-        "order": "desc",
-        "per_page": per_page,
-        "page": page,
-    }
-    r = safe_get(GITHUB_SEARCH_URL, params=params)
-    if r:
-        return r.json().get("items", [])
-    return []
-
-def fetch_readme_raw(full_name: str) -> Optional[str]:
-    url = f"{GITHUB_API_URL}/repos/{full_name}/readme"
-    headers = dict(session.headers)
-    headers["Accept"] = "application/vnd.github.v3.raw"
-    r = safe_get(url, headers=headers)
-    if r:
-        # keep lowercase for faster keyword checks later
-        return r.text.lower()
-    return None
-
-def fetch_repo_topics(full_name: str) -> List[str]:
-    if not TOKEN:
+def fetch_repos(query: str, per_page: int = PER_PAGE) -> List[dict]:
+    params = {"q": f"{query} in:name,description,readme fork:false", "sort": "stars", "order": "desc", "per_page": per_page}
+    r = request_with_retry(GITHUB_API_SEARCH, params=params)
+    if not r:
         return []
-    url = f"{GITHUB_API_URL}/repos/{full_name}/topics"
-    headers = dict(HEADERS)
-    headers.update(TOPICS_ACCEPT_HEADER)
-    r = safe_get(url, headers=headers)
-    if r:
-        return r.json().get("names", [])
-    return []
+    data = r.json()
+    return data.get("items", [])
 
-# ---------------------------
-# Email extraction (lightweight)
-# ---------------------------
-def get_public_email_from_user(username: str) -> Optional[str]:
-    url = f"{GITHUB_API_URL}/users/{username}"
-    r = safe_get(url)
-    if r:
-        email = r.json().get("email")
-        if email and EMAIL_REGEX.search(email):
-            return email
-    return None
 
-def get_email_from_readme(full_name: str) -> Optional[str]:
-    text = fetch_readme_raw(full_name)
+def get_repo_details(full_name: str) -> Optional[dict]:
+    url = GITHUB_API_REPO.format(full_name=full_name)
+    r = request_with_retry(url)
+    if not r:
+        return None
+    return r.json()
+
+
+def get_readme_text(full_name: str) -> Optional[str]:
+    url = GITHUB_API_README.format(full_name=full_name)
+    r = request_with_retry(url)
+    if not r:
+        return None
+    try:
+        data = r.json()
+        content = data.get("content")
+        encoding = data.get("encoding", "base64")
+        if content and encoding == "base64":
+            raw = base64.b64decode(content).decode(errors="ignore")
+            return raw
+        return None
+    except Exception:
+        return None
+
+
+def extract_email(text: Optional[str]) -> Optional[str]:
     if not text:
         return None
-    m = EMAIL_REGEX.search(text)
-    if m:
-        return m.group(0)
-    # check mailto:
-    mailto = re.search(r"mailto:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})", text, re.IGNORECASE)
-    if mailto:
-        return mailto.group(1)
-    return None
+    m = EMAIL_RE.search(text)
+    return m.group(0) if m else None
 
-def extract_contact_email(full_name: str, owner_username: str) -> Optional[str]:
-    # lightweight: public user email -> README email -> blog fallback
-    email = get_public_email_from_user(owner_username)
+
+def get_owner_email(owner_login: str) -> Optional[str]:
+    url = GITHUB_API_USER.format(login=owner_login)
+    r = request_with_retry(url)
+    if not r:
+        return None
+    u = r.json()
+    # public email sometimes present
+    email = u.get("email")
     if email:
         return email
-    time.sleep(0.08)
-    email = get_email_from_readme(full_name)
-    if email:
-        return email
-    # fallback to blog url on user profile (rare)
-    url = f"{GITHUB_API_URL}/users/{owner_username}"
-    r = safe_get(url)
-    if r:
-        blog = r.json().get("blog") or ""
-        m = EMAIL_REGEX.search(blog)
-        if m:
-            return m.group(0)
+    # try blog/contact fields (sometimes contain emails)
+    for field in ("bio", "blog", "company", "name"):
+        txt = u.get(field) or ""
+        e = extract_email(txt)
+        if e:
+            return e
     return None
 
-# ---------------------------
-# Simple scoring helpers
-# ---------------------------
-def log_scale_stars(stars: int) -> float:
-    return min(1.0, math.log10(max(1, stars)) / 3.0)
 
-def tokenize(text: str) -> List[str]:
-    if not text:
-        return []
-    return [t for t in re.split(r"[^A-Za-z0-9]+", text.lower()) if t and len(t) > 1]
+def is_relevant(repo: dict, topic: str, queries: List[str], readme_text: Optional[str], details: Optional[dict]) -> bool:
+    """Stricter relevance rules: keywords in name/desc/readme or topics match."""
+    name = (repo.get("name") or "").lower()
+    desc = (repo.get("description") or "").lower()
+    readme = (readme_text or "").lower()
+    # quick keyword check: any learning keyword in name/desc/readme
+    if any(kw in name or kw in desc or kw in readme for kw in LEARNING_KEYWORDS):
+        return True
 
-def keywords_from_topic(topic: str, queries: List[str]) -> List[str]:
-    tokens = set(tokenize(topic))
+    # check repo topics (if available)
+    topics = details.get("topics", []) if details else []
+    if topic.lower() in [t.lower() for t in topics]:
+        return True
+
+    # check if any query tokens show up in readme/desc/name
     for q in queries:
-        tokens.update(tokenize(q))
-    return sorted(tokens)
+        qlower = q.lower()
+        if qlower in name or qlower in desc or qlower in readme:
+            return True
 
-def fuzz_match_score(text_blob: str, keywords: List[str]) -> float:
-    if not text_blob:
-        return 0.0
-    hits = sum(1 for k in keywords if k and k in text_blob)
-    return min(1.0, hits / max(1, len(keywords)))
+    return False
 
-def prelim_score_repo(repo: dict, keywords: List[str]) -> float:
-    name = (repo.get("name") or "").lower()
-    full_name = (repo.get("full_name") or "").lower()
-    desc = (repo.get("description") or "") or ""
-    desc_low = desc.lower()
-    stars_score = log_scale_stars(repo.get("stargazers_count", 0))
-    blob = " ".join([name, full_name, desc_low])
-    keyword_score = fuzz_match_score(blob, keywords)
-    # weighted: keywords first, but stars matter
-    score = 0.7 * keyword_score + 0.3 * stars_score
-    if repo.get("fork"):
-        score *= 0.9
-    return float(score)
 
-def refined_score_repo(repo: dict, keywords: List[str], readme_text: Optional[str], repo_topics: List[str]) -> float:
-    name = (repo.get("name") or "").lower()
-    full_name = (repo.get("full_name") or "").lower()
-    desc_low = (repo.get("description") or "") or ""
-    readme_sample = (readme_text or "")[:4000]
-    blob = " ".join([name, full_name, desc_low, readme_sample])
-    keyword_score = fuzz_match_score(blob, keywords)
-    topic_matches = 0
-    if repo_topics:
-        repo_topics_lower = [t.lower() for t in repo_topics]
-        topic_matches = sum(1 for k in keywords if k in repo_topics_lower)
-        topic_matches = topic_matches / max(1, len(keywords))
-    stars_score = log_scale_stars(repo.get("stargazers_count", 0))
-    score = 0.5 * keyword_score + 0.35 * stars_score + 0.13 * topic_matches
-    if repo.get("fork"):
-        score *= 0.85
-    return float(score)
-
-# ---------------------------
-# Parallel fetching for refinement
-# ---------------------------
-def _fetch_readme_and_topics_single(full_name: str) -> dict:
-    readme = None
-    topics = []
-    try:
-        if FETCH_README:
-            readme = fetch_readme_raw(full_name)
-    except Exception:
-        readme = None
-    if FETCH_TOPICS and TOKEN:
-        try:
-            topics = fetch_repo_topics(full_name)
-        except Exception:
-            topics = []
-    return {"readme": readme, "topics": topics}
-
-def fetch_readme_and_topics_parallel(full_names: List[str]) -> dict:
-    out = {}
-    if not full_names:
-        return out
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as exe:
-        futures = {exe.submit(_fetch_readme_and_topics_single, full): full for full in full_names}
-        for fut in as_completed(futures):
-            full = futures[fut]
-            try:
-                out_val = fut.result()
-            except Exception:
-                out_val = {"readme": None, "topics": []}
-            out[full] = out_val
-            # tiny jitter to avoid bursts
-            time.sleep(0.01 + random.random() * 0.03)
-    return out
-
-# ---------------------------
-# Selection logic
-# ---------------------------
-def select_top_by_stars_and_score(candidate_pool: List[dict], topic: str, max_per_topic: int = MAX_PER_TOPIC) -> List[dict]:
-    topic_min_stars = MIN_STARS_BY_TOPIC.get(topic, MIN_STARS_BY_TOPIC.get("default", 0))
-    meets_floor = [c for c in candidate_pool if (c["repo"].get("stargazers_count", 0) or 0) >= topic_min_stars]
-    below_floor = [c for c in candidate_pool if (c["repo"].get("stargazers_count", 0) or 0) < topic_min_stars]
-
-    meets_floor.sort(key=lambda x: (x["repo"].get("stargazers_count", 0), x["score"]), reverse=True)
-    below_floor.sort(key=lambda x: x["score"], reverse=True)
-
-    top_picks = []
-    for c in meets_floor:
-        if len(top_picks) >= max_per_topic:
-            break
-        top_picks.append(c)
-    if len(top_picks) < max_per_topic:
-        needed = max_per_topic - len(top_picks)
-        top_picks.extend(below_floor[:needed])
-
-    print(f"Topic '{topic}': {len(meets_floor)} >= {topic_min_stars} stars; selected {len(top_picks)} from pool {len(candidate_pool)}")
-    return top_picks
-
-# ---------------------------
-# Main crawl (two-stage)
-# ---------------------------
+# ---------- main crawl ----------
 def crawl_all():
-    all_selected = []
+    all_results = []
     for topic, queries in TOPIC_QUERIES.items():
-        print("\n" + "="*60)
-        print(f"🔎 Crawling topic: {topic}")
-        candidate_pool = []
+        print(f"\n🔎 Crawling topic: {topic}")
+        candidates = []
         seen = set()
 
-        # Prepare keywords (used for scoring)
-        keywords = keywords_from_topic(topic, queries)
+        # build combined queries list (topic + configured queries)
+        q_list = [topic] + queries
 
-        # Stage A: cheap collection + prelim scoring
-        topic_min_stars = MIN_STARS_BY_TOPIC.get(topic, MIN_STARS_BY_TOPIC.get("default", 0))
-        for q in queries:
-            page = 1
-            # build a lean search query that asks GitHub to filter by stars when possible
-            query_str = build_search_query(q, min_stars=topic_min_stars if topic_min_stars >= 50 else 0)
-            while page <= MAX_PAGES_PER_QUERY:
-                repos = fetch_repos(query_str, per_page=PER_PAGE, page=page)
-                if not repos:
-                    break
-                for repo in repos:
-                    full_name = repo.get("full_name")
-                    if not full_name or full_name in seen:
-                        continue
-                    seen.add(full_name)
-                    if len(candidate_pool) >= CANDIDATE_POOL_LIMIT:
-                        break
-                    s_prelim = prelim_score_repo(repo, keywords)
-                    candidate_pool.append({"repo": repo, "prelim_score": s_prelim})
-                page += 1
-                time.sleep(REQUEST_PAUSE + random.random() * 0.25)
-                if len(candidate_pool) >= CANDIDATE_POOL_LIMIT:
-                    break
+        for q in q_list:
+            repos = fetch_repos(q)
+            if not repos:
+                continue
+            for repo in repos:
+                full_name = repo.get("full_name")
+                if not full_name or full_name in seen:
+                    continue
+                seen.add(full_name)
 
-        if not candidate_pool:
-            print(f"⚠️ No candidates for topic {topic}")
+                # quick pass: must have minimum star threshold to be considered
+                stars = repo.get("stargazers_count", 0)
+                if stars < 10:  # small floor; reduce noise
+                    continue
+
+                # fetch details and README for stronger relevance checks (costly but filtered)
+                details = get_repo_details(full_name)
+                time.sleep(0.5 + random.random() * 0.6)
+                readme = get_readme_text(full_name)
+                time.sleep(0.5 + random.random() * 0.6)
+
+                if not is_relevant(repo, topic, queries, readme, details):
+                    continue
+
+                # Try to locate an email: owner profile first, then README
+                owner = repo.get("owner", {}) or {}
+                owner_login = owner.get("login")
+                email = None
+                if owner_login:
+                    email = get_owner_email(owner_login)
+                    time.sleep(0.4 + random.random() * 0.6)
+                if not email:
+                    email = extract_email(readme)
+
+                candidates.append({
+                    "topic": topic,
+                    "name": repo.get("name"),
+                    "full_name": full_name,
+                    "url": repo.get("html_url"),
+                    "stars": stars,
+                    "description": repo.get("description"),
+                    "owner": owner_login,
+                    "owner_email": email,
+                })
+
+                # gentle pacing
+                if len(candidates) >= MAX_PER_TOPIC_CANDIDATES:
+                    break
+            # small pause between different queries
+            time.sleep(1 + random.random() * 1.5)
+            if len(candidates) >= MAX_PER_TOPIC_CANDIDATES:
+                break
+
+        if not candidates:
+            print(f"⚠️ No candidates found for {topic}")
             continue
 
-        # Stage B: refine top-K candidates with README/topics (parallel)
-        candidate_pool.sort(key=lambda x: x["prelim_score"], reverse=True)
-        top_k = candidate_pool[:REFINE_TOP_K]
-        full_names = [c["repo"]["full_name"] for c in top_k]
-        fetched = fetch_readme_and_topics_parallel(full_names)
+        # pick top-K by stars per topic
+        candidates_sorted = sorted(candidates, key=lambda x: x["stars"], reverse=True)[:TOP_K]
+        for c in candidates_sorted:
+            all_results.append(c)
+        print(f"✅ Collected {len(candidates_sorted)} repos for {topic}")
 
-        refined_pool = []
-        for c in top_k:
-            repo = c["repo"]
-            full_name = repo.get("full_name")
-            readme_text = fetched.get(full_name, {}).get("readme")
-            repo_topics = fetched.get(full_name, {}).get("topics", [])
-            refined_s = refined_score_repo(repo, keywords, readme_text, repo_topics)
-            refined_pool.append({"repo": repo, "score": refined_s, "readme": readme_text, "repo_topics": repo_topics})
-
-        # If refined_pool is small, fill with next-best prelim candidates (without README)
-        if len(refined_pool) < REFINE_TOP_K and len(candidate_pool) > REFINE_TOP_K:
-            for c in candidate_pool[REFINE_TOP_K:REFINE_TOP_K + (REFINE_TOP_K - len(refined_pool))]:
-                refined_pool.append({"repo": c["repo"], "score": c["prelim_score"], "readme": None, "repo_topics": []})
-
-        # Final selection using star-floor-first logic
-        top_picks = select_top_by_stars_and_score(refined_pool, topic, MAX_PER_TOPIC)
-
-        for entry in top_picks:
-            repo = entry["repo"]
-            owner = repo.get("owner", {}).get("login")
-            full_name = repo.get("full_name")
-            email = ""
-            if EMAIL_EXTRACTION:
-                # optional and comparatively expensive
-                try:
-                    email = extract_contact_email(full_name, owner) or ""
-                except Exception:
-                    email = ""
-                time.sleep(0.08)
-            selected = {
-                "topic": topic,
-                "name": repo.get("name"),
-                "full_name": full_name,
-                "url": repo.get("html_url"),
-                "stars": repo.get("stargazers_count", 0),
-                "description": repo.get("description"),
-                "score": entry.get("score"),
-                "email": email,
-                "repo_topics": ",".join(entry.get("repo_topics", []))
-            }
-            all_selected.append(selected)
-            print(f" + Selected: {selected['full_name']}  ⭐ {selected['stars']}  score={selected['score']:.3f}  email={selected['email'] or 'N/A'}")
-
-    # Save CSV
-    df = pd.DataFrame(all_selected)
-    if not df.empty:
-        df = df.sort_values(by=["topic", "stars", "score"], ascending=[True, False, False])
-        out_file = "repos_selected_dryrun.csv" if DRY_RUN else "repos_selected.csv"
-        df.to_csv(out_file, index=False)
-        print(f"\n✅ Saved {len(df)} selected repos to {out_file}")
+    # save results
+    if all_results:
+        df = pd.DataFrame(all_results)
+        cols = ["topic", "name", "full_name", "url", "stars", "description", "owner", "owner_email"]
+        df = df[cols]
+        df.to_csv("repos.csv", index=False)
+        print(f"\n✅ Saved {len(df)} repos to repos.csv")
     else:
-        print("⚠️ No repos selected.")
+        print("⚠️ No repositories collected.")
 
-# ---------------------------
-# Run
-# ---------------------------
+
 if __name__ == "__main__":
     crawl_all()
