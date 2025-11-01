@@ -20,7 +20,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 <!-- REPO_TABLE_START -->
 
-## Augmented reality
+## Augmented reality with ai
 
 | Repository                                                                                                          | Owner         |   ⭐ Stars |
 |:--------------------------------------------------------------------------------------------------------------------|:--------------|----------:|
@@ -33,13 +33,13 @@ Below is the **auto-generated table of repositories** by topic.
 
 ## Blockchain with ai
 
-| Repository                                                                                     | Owner              |   ⭐ Stars |
-|:-----------------------------------------------------------------------------------------------|:-------------------|----------:|
-| [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                            | Developer-Y        |     70105 |
-| [Self-Hosting-Guide](https://github.com/mikeroyal/Self-Hosting-Guide)                          | mikeroyal          |     17490 |
-| [financial-machine-learning](https://github.com/firmai/financial-machine-learning)             | firmai             |      8242 |
-| [awesome-youtubers](https://github.com/JoseDeFreitas/awesome-youtubers)                        | JoseDeFreitas      |      6991 |
-| [awesome-systematic-trading](https://github.com/paperswithbacktest/awesome-systematic-trading) | paperswithbacktest |      6157 |
+| Repository                                                                                                     | Owner               |   ⭐ Stars |
+|:---------------------------------------------------------------------------------------------------------------|:--------------------|----------:|
+| [project-based-learning](https://github.com/practical-tutorials/project-based-learning)                        | practical-tutorials |    248494 |
+| [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                                            | Developer-Y         |     70105 |
+| [Self-Hosting-Guide](https://github.com/mikeroyal/Self-Hosting-Guide)                                          | mikeroyal           |     17490 |
+| [PocketFlow-Tutorial-Codebase-Knowledge](https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge) | The-Pocket          |     11663 |
+| [financial-machine-learning](https://github.com/firmai/financial-machine-learning)                             | firmai              |      8242 |
 
 
 ## Edge ai
@@ -134,7 +134,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
-| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                            | freeCodeCamp        |    431062 |
+| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                            | freeCodeCamp        |    431063 |
 | [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
 | [tensorflow](https://github.com/tensorflow/tensorflow)                                  | tensorflow          |    192285 |
 | [funNLP](https://github.com/fighting41love/funNLP)                                      | fighting41love      |     76943 |
@@ -146,7 +146,7 @@ Below is the **auto-generated table of repositories** by topic.
 | Repository                                                                           | Owner          |   ⭐ Stars |
 |:-------------------------------------------------------------------------------------|:---------------|----------:|
 | [funNLP](https://github.com/fighting41love/funNLP)                                   | fighting41love |     76943 |
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning) | josephmisiti   |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning) | josephmisiti   |     70445 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                  | Developer-Y    |     70105 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                 | mlabonne       |     66425 |
 | [awesome-courses](https://github.com/prakhar1989/awesome-courses)                    | prakhar1989    |     64101 |
@@ -156,7 +156,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                           | Owner          |   ⭐ Stars |
 |:-------------------------------------------------------------------------------------|:---------------|----------:|
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning) | josephmisiti   |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning) | josephmisiti   |     70445 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                  | Developer-Y    |     70105 |
 | [professional-programming](https://github.com/charlax/professional-programming)      | charlax        |     49677 |
 | [Free-Certifications](https://github.com/cloudcommunity/Free-Certifications)         | cloudcommunity |     42011 |
@@ -189,9 +189,9 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
-| [developer-roadmap](https://github.com/kamranahmedse/developer-roadmap)                 | kamranahmedse       |    342502 |
+| [developer-roadmap](https://github.com/kamranahmedse/developer-roadmap)                 | kamranahmedse       |    342504 |
 | [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70445 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                     | Developer-Y         |     70105 |
 | [awesome-courses](https://github.com/prakhar1989/awesome-courses)                       | prakhar1989         |     64101 |
 
@@ -201,7 +201,7 @@ Below is the **auto-generated table of repositories** by topic.
 | Repository                                                                                                                                                                                    | Owner         |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------|----------:|
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                                                                                                                           | Developer-Y   |     70105 |
-| [500-AI-Machine-learning-Deep-learning-Computer-vision-NLP-Projects-with-code](https://github.com/ashishpatel26/500-AI-Machine-learning-Deep-learning-Computer-vision-NLP-Projects-with-code) | ashishpatel26 |     28476 |
+| [500-AI-Machine-learning-Deep-learning-Computer-vision-NLP-Projects-with-code](https://github.com/ashishpatel26/500-AI-Machine-learning-Deep-learning-Computer-vision-NLP-Projects-with-code) | ashishpatel26 |     28477 |
 | [awesome-datascience](https://github.com/academic/awesome-datascience)                                                                                                                        | academic      |     27650 |
 | [best-of-ml-python](https://github.com/lukasmasuch/best-of-ml-python)                                                                                                                         | lukasmasuch   |     22669 |
 | [Self-Hosting-Guide](https://github.com/mikeroyal/Self-Hosting-Guide)                                                                                                                         | mikeroyal     |     17490 |
@@ -222,9 +222,9 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                           | Owner         |   ⭐ Stars |
 |:-------------------------------------------------------------------------------------|:--------------|----------:|
-| [developer-roadmap](https://github.com/kamranahmedse/developer-roadmap)              | kamranahmedse |    342502 |
+| [developer-roadmap](https://github.com/kamranahmedse/developer-roadmap)              | kamranahmedse |    342504 |
 | [fastapi](https://github.com/fastapi/fastapi)                                        | fastapi       |     91397 |
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning) | josephmisiti  |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning) | josephmisiti  |     70445 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                  | Developer-Y   |     70105 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                 | mlabonne      |     66425 |
 
@@ -255,7 +255,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                                                | Owner        |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------------------------|:-------------|----------:|
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)                      | josephmisiti |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)                      | josephmisiti |     70445 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                                       | Developer-Y  |     70105 |
 | [awesome-courses](https://github.com/prakhar1989/awesome-courses)                                         | prakhar1989  |     64101 |
 | [professional-programming](https://github.com/charlax/professional-programming)                           | charlax      |     49677 |
@@ -266,7 +266,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
-| [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248493 |
+| [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
 | [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70444 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                     | Developer-Y         |     70105 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                    | mlabonne            |     66425 |
@@ -278,8 +278,8 @@ Below is the **auto-generated table of repositories** by topic.
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
 | [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
-| [funNLP](https://github.com/fighting41love/funNLP)                                      | fighting41love      |     76943 |
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70444 |
+| [funNLP](https://github.com/fighting41love/funNLP)                                      | fighting41love      |     76944 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70445 |
 | [awesome-courses](https://github.com/prakhar1989/awesome-courses)                       | prakhar1989         |     64101 |
 | [awesome-flutter](https://github.com/Solido/awesome-flutter)                            | Solido              |     57786 |
 
@@ -288,7 +288,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                                                                | Owner        |   ⭐ Stars |
 |:--------------------------------------------------------------------------------------------------------------------------|:-------------|----------:|
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)                                      | josephmisiti |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)                                      | josephmisiti |     70445 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                                                       | Developer-Y  |     70105 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                                                      | mlabonne     |     66425 |
 | [awesome-courses](https://github.com/prakhar1989/awesome-courses)                                                         | prakhar1989  |     64101 |
@@ -299,7 +299,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                                      | Owner               |   ⭐ Stars |
 |:------------------------------------------------------------------------------------------------|:--------------------|----------:|
-| [project-based-learning](https://github.com/practical-tutorials/project-based-learning)         | practical-tutorials |    248493 |
+| [project-based-learning](https://github.com/practical-tutorials/project-based-learning)         | practical-tutorials |    248494 |
 | [funNLP](https://github.com/fighting41love/funNLP)                                              | fighting41love      |     76943 |
 | [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)            | josephmisiti        |     70444 |
 | [ailearning](https://github.com/apachecn/ailearning)                                            | apachecn            |     41647 |
@@ -321,8 +321,8 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                                                                | Owner          |   ⭐ Stars |
 |:--------------------------------------------------------------------------------------------------------------------------|:---------------|----------:|
-| [funNLP](https://github.com/fighting41love/funNLP)                                                                        | fighting41love |     76943 |
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)                                      | josephmisiti   |     70444 |
+| [funNLP](https://github.com/fighting41love/funNLP)                                                                        | fighting41love |     76944 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)                                      | josephmisiti   |     70445 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                                                      | mlabonne       |     66425 |
 | [annotated_deep_learning_paper_implementations](https://github.com/labmlai/annotated_deep_learning_paper_implementations) | labmlai        |     64020 |
 | [DeepSpeed](https://github.com/deepspeedai/DeepSpeed)                                                                     | deepspeedai    |     40575 |
@@ -332,8 +332,8 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
-| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                            | freeCodeCamp        |    431062 |
-| [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248493 |
+| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                            | freeCodeCamp        |    431063 |
+| [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
 | [tensorflow](https://github.com/tensorflow/tensorflow)                                  | tensorflow          |    192285 |
 | [funNLP](https://github.com/fighting41love/funNLP)                                      | fighting41love      |     76943 |
 | [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70444 |
@@ -354,7 +354,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                           | Owner         |   ⭐ Stars |
 |:-------------------------------------------------------------------------------------|:--------------|----------:|
-| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                         | freeCodeCamp  |    431062 |
+| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                         | freeCodeCamp  |    431063 |
 | [tensorflow](https://github.com/tensorflow/tensorflow)                               | tensorflow    |    192285 |
 | [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning) | josephmisiti  |     70444 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                 | mlabonne      |     66425 |
@@ -366,7 +366,7 @@ Below is the **auto-generated table of repositories** by topic.
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
 | [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70445 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                     | Developer-Y         |     70105 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                    | mlabonne            |     66425 |
 | [awesome-courses](https://github.com/prakhar1989/awesome-courses)                       | prakhar1989         |     64101 |
@@ -379,7 +379,7 @@ Below is the **auto-generated table of repositories** by topic.
 | [funNLP](https://github.com/fighting41love/funNLP)                                   | fighting41love |     76943 |
 | [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning) | josephmisiti   |     70444 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                 | mlabonne       |     66425 |
-| [30-Days-Of-Python](https://github.com/Asabeneh/30-Days-Of-Python)                   | Asabeneh       |     51811 |
+| [30-Days-Of-Python](https://github.com/Asabeneh/30-Days-Of-Python)                   | Asabeneh       |     51813 |
 | [DeepSpeed](https://github.com/deepspeedai/DeepSpeed)                                | deepspeedai    |     40575 |
 
 
@@ -387,7 +387,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                                              | Owner          |   ⭐ Stars |
 |:--------------------------------------------------------------------------------------------------------|:---------------|----------:|
-| [funNLP](https://github.com/fighting41love/funNLP)                                                      | fighting41love |     76943 |
+| [funNLP](https://github.com/fighting41love/funNLP)                                                      | fighting41love |     76944 |
 | [professional-programming](https://github.com/charlax/professional-programming)                         | charlax        |     49677 |
 | [linkedin-skill-assessments-quizzes](https://github.com/Ebazhanov/linkedin-skill-assessments-quizzes)   | Ebazhanov      |     28662 |
 | [awesome-production-machine-learning](https://github.com/EthicalML/awesome-production-machine-learning) | EthicalML      |     19549 |
@@ -398,8 +398,8 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
-| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                            | freeCodeCamp        |    431062 |
-| [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248493 |
+| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                            | freeCodeCamp        |    431063 |
+| [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
 | [tensorflow](https://github.com/tensorflow/tensorflow)                                  | tensorflow          |    192285 |
 | [fastapi](https://github.com/fastapi/fastapi)                                           | fastapi             |     91397 |
 | [funNLP](https://github.com/fighting41love/funNLP)                                      | fighting41love      |     76943 |
@@ -409,7 +409,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
-| [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248493 |
+| [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
 | [ML-For-Beginners](https://github.com/microsoft/ML-For-Beginners)                       | microsoft           |     78451 |
 | [models](https://github.com/tensorflow/models)                                          | tensorflow          |     77668 |
 | [funNLP](https://github.com/fighting41love/funNLP)                                      | fighting41love      |     76943 |
@@ -420,7 +420,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                                | Owner        |   ⭐ Stars |
 |:------------------------------------------------------------------------------------------|:-------------|----------:|
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)      | josephmisiti |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)      | josephmisiti |     70445 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                      | mlabonne     |     66425 |
 | [learnopencv](https://github.com/spmallick/learnopencv)                                   | spmallick    |     22452 |
 | [ai-engineering-hub](https://github.com/patchy631/ai-engineering-hub)                     | patchy631    |     20268 |
@@ -431,9 +431,9 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                              | Owner               |   ⭐ Stars |
 |:----------------------------------------------------------------------------------------|:--------------------|----------:|
-| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                            | freeCodeCamp        |    431062 |
+| [freeCodeCamp](https://github.com/freeCodeCamp/freeCodeCamp)                            | freeCodeCamp        |    431063 |
 | [project-based-learning](https://github.com/practical-tutorials/project-based-learning) | practical-tutorials |    248494 |
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)    | josephmisiti        |     70445 |
 | [awesome-courses](https://github.com/prakhar1989/awesome-courses)                       | prakhar1989         |     64101 |
 | [professional-programming](https://github.com/charlax/professional-programming)         | charlax             |     49677 |
 
@@ -442,7 +442,7 @@ Below is the **auto-generated table of repositories** by topic.
 
 | Repository                                                                                                                | Owner        |   ⭐ Stars |
 |:--------------------------------------------------------------------------------------------------------------------------|:-------------|----------:|
-| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)                                      | josephmisiti |     70444 |
+| [awesome-machine-learning](https://github.com/josephmisiti/awesome-machine-learning)                                      | josephmisiti |     70445 |
 | [cs-video-courses](https://github.com/Developer-Y/cs-video-courses)                                                       | Developer-Y  |     70105 |
 | [llm-course](https://github.com/mlabonne/llm-course)                                                                      | mlabonne     |     66425 |
 | [awesome-courses](https://github.com/prakhar1989/awesome-courses)                                                         | prakhar1989  |     64101 |
