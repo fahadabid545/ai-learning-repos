@@ -115,15 +115,26 @@ def build_table(rows: List[dict]) -> str:
     lines  = [header, sep]
 
     for r in rows:
-        desc = (r.get("description") or "").strip()
+        desc = r.get("description")
+
+        if pd.isna(desc):
+            desc = ""
+        else:
+            desc = str(desc).strip()
         if len(desc) > 100:
             desc = desc[:97] + "..."
 
         repo_link = f"[{r['name']}]({r['url']})"
         stars     = format_stars(int(r.get("stars", 0)))
-        language  = r.get("language") or "-"
-        repo_type = (r.get("repo_type") or "project").replace("-", " ").title()
-        updated   = r.get("last_updated") or "-"
+        language = "-" if pd.isna(r.get("language")) else str(r.get("language"))
+        
+        repo_type = (
+            "Project"
+            if pd.isna(r.get("repo_type"))
+            else str(r.get("repo_type")).replace("-", " ").title()
+        )
+        
+        updated = "-" if pd.isna(r.get("last_updated")) else str(r.get("last_updated"))
 
         lines.append(
             f"| {repo_link} | {desc} | {stars} | {language} | {repo_type} | {updated} |"
