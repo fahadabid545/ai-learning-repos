@@ -1,22 +1,24 @@
-# 📚 AI Learning Repos 🚀
+# Find the Latest AI Learning Repos 
 
 Welcome!  
-This repository is your **curated hub of AI learning resources** — GitHub repositories that are worth following if you’re a **student, beginner, or developer** exploring AI.  
+This repository is your **curated hub** of ***AI learning resources***. Find GitHub repositories worth following if you’re a ***student, beginner, or developer*** exploring AI.  
 
-Instead of searching endlessly, you’ll find **hand-picked repositories** grouped by topic, complete with:  
-- ✅ **Clickable links** to the repo  
-- 👩‍💻 **Owner information**  
-- ⭐ **Star counts** (popularity indicator)  
+Instead of searching endlessly, you’ll find **Latest and most valuable repositories** grouped by topic, complete with:  
+- **Clickable links** to the repo  
+- **Description**
+- **Type**
+- **Language**
+- **Star counts** 
 
 And the best part? **It stays updated automatically!**  
-A script + GitHub Actions refreshes this list regularly, so you always see the latest stars and trending repos.  
+A script + GitHub Actions refreshes this list regularly, so you always see the latest and trending repos.  
 
 ---
 
-## 📊 AI Learning Repositories
+## AI Learning Repositories
 
-Below is the **auto-generated table of repositories** by topic.  
-*(Updated whenever the workflow runs — you don’t need to manually edit this!)*  
+Below is the **auto generated table of repositories** by topic.  
+*(Updated whenever the workflow runs, you don’t need to manually edit this!)*  
 
 <!-- REPO_TABLE_START -->
 
