@@ -125,15 +125,39 @@ def build_table(rows: List[dict]) -> str:
     lines  = [header, sep]
 
     for r in rows:
-        desc = (r.get("description") or "").strip()
+        # Handle NaN, float, and None values for description
+        desc = r.get("description")
+        if desc is None or (isinstance(desc, float) and pd.isna(desc)):
+            desc = ""
+        else:
+            desc = str(desc).strip()
+        
         if len(desc) > 100:
             desc = desc[:97] + "..."
 
         repo_link = f"[{r['name']}]({r['url']})"
         stars     = format_stars(int(r.get("stars", 0)))
-        language  = r.get("language") or "-"
-        repo_type = (r.get("repo_type") or "project").replace("-", " ").title()
-        updated   = r.get("last_updated") or "-"
+        
+        # Handle language field
+        language = r.get("language")
+        if language is None or (isinstance(language, float) and pd.isna(language)):
+            language = "-"
+        else:
+            language = str(language).strip() or "-"
+        
+        # Handle repo_type field
+        repo_type = r.get("repo_type")
+        if repo_type is None or (isinstance(repo_type, float) and pd.isna(repo_type)):
+            repo_type = "project"
+        else:
+            repo_type = str(repo_type).strip().replace("-", " ").title() or "project"
+        
+        # Handle last_updated field
+        updated = r.get("last_updated")
+        if updated is None or (isinstance(updated, float) and pd.isna(updated)):
+            updated = "-"
+        else:
+            updated = str(updated).strip() or "-"
 
         lines.append(
             f"| {repo_link} | {desc} | {stars} | {language} | {repo_type} | {updated} |"
